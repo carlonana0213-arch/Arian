@@ -1,8 +1,13 @@
-const mongoose = require("mongoose");
-
-const projectSchema = new mongoose.Schema(
+const assetSchema = new mongoose.Schema(
   {
-    name: {
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+      index: true,
+    },
+
+    title: {
       type: String,
       required: true,
       trim: true,
@@ -11,50 +16,71 @@ const projectSchema = new mongoose.Schema(
     description: {
       type: String,
       default: "",
+      trim: true,
     },
 
-    manager: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    assetType: {
+      type: String,
+      enum: ["image", "design", "document", "video", "other"],
+      default: "image",
     },
 
-    client: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+    currentVersion: {
+      type: Number,
+      default: 1,
     },
 
-    members: [
+    versions: [
       {
-        user: {
+        versionNumber: {
+          type: Number,
+          required: true,
+        },
+
+        fileUrl: {
+          type: String,
+          required: true,
+        },
+
+        publicId: {
+          type: String,
+          required: true,
+        },
+
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+
+        reviewComment: {
+          type: String,
+          default: "",
+        },
+
+        reviewedBy: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
         },
 
-        role: {
-          type: String,
-          enum: ["artist", "manager", "client"],
+        reviewedAt: {
+          type: Date,
         },
       },
     ],
-
-    startDate: {
-      type: Date,
-    },
-
-    deadline: {
-      type: Date,
-    },
-
-    status: {
-      type: String,
-      enum: ["planning", "active", "completed", "archived"],
-      default: "planning",
-    },
   },
   {
     timestamps: true,
   },
 );
-
-module.exports = mongoose.model("Project", projectSchema);
