@@ -6,7 +6,7 @@ const generateToken = require("../utils/generateToken");
 //register
 const register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role } = req.body;
+    const { firstName, lastName, email, password, role } = req.body || {};
 
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({
