@@ -6,17 +6,23 @@ const Dashboard = () => {
 
   return (
     <div>
-      <h1>Welcome to Arian</h1>
+      <h1>Arian Dashboard</h1>
 
       <p>
-        Logged in as: {user?.firstName} {user?.lastName}
+        Welcome, {user?.firstName} {user?.lastName}
       </p>
 
-      <p>Role: {user?.role}</p>
+      <p>
+        Role: <strong>{user?.role}</strong>
+      </p>
 
-      <nav>
-        <Link to="/projects">Projects</Link>
-      </nav>
+      <div>
+        <Link to="/projects">
+          <button>View Projects</button>
+        </Link>
+      </div>
+
+      <br />
 
       <button onClick={logout}>Logout</button>
     </div>

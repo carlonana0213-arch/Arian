@@ -1,11 +1,8 @@
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
-
+const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 
-// ========================================
-// HELPER: CHECK PROJECT ACCESS
-// ========================================
 const userHasProjectAccess = (project, user) => {
   if (user.role === "admin") {
     return true;
