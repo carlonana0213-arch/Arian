@@ -223,11 +223,21 @@ const updateAsset = async (req, res) => {
       });
     }
 
-    const isManager = project.manager.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
 
-    if (req.user.role !== "admin" && !isManager) {
+    const isManager =
+      project.manager && project.manager.toString() === req.user._id.toString();
+
+    const assetOwner =
+      asset.versions.length > 0 &&
+      asset.versions[0].uploadedBy &&
+      asset.versions[0].uploadedBy.toString() === req.user._id.toString();
+
+    const isArtistOwner = req.user.role === "artist" && assetOwner;
+
+    if (!isAdmin && !isManager && !isArtistOwner) {
       return res.status(403).json({
-        message: "Only project managers can edit asset metadata.",
+        message: "You can only edit assets that you own.",
       });
     }
 
@@ -496,11 +506,21 @@ const deleteAsset = async (req, res) => {
       });
     }
 
-    const isManager = project.manager.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
 
-    if (req.user.role !== "admin" && !isManager) {
+    const isManager =
+      project.manager && project.manager.toString() === req.user._id.toString();
+
+    const assetOwner =
+      asset.versions.length > 0 &&
+      asset.versions[0].uploadedBy &&
+      asset.versions[0].uploadedBy.toString() === req.user._id.toString();
+
+    const isArtistOwner = req.user.role === "artist" && assetOwner;
+
+    if (!isAdmin && !isManager && !isArtistOwner) {
       return res.status(403).json({
-        message: "Only the project manager can delete assets.",
+        message: "You can only delete assets that you own.",
       });
     }
 

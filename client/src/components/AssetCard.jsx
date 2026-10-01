@@ -5,6 +5,8 @@ import {
   uploadNewVersion,
   approveVersion,
   rejectVersion,
+  updateAsset,
+  deleteAsset,
 } from "../services/assetService";
 
 const AssetCard = ({ asset, onUpdated }) => {
@@ -12,7 +14,16 @@ const AssetCard = ({ asset, onUpdated }) => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [reviewComment, setReviewComment] = useState("");
+  const [editing, setEditing] = useState(false);
 
+  const [editForm, setEditForm] = useState({
+    title: asset.title || "",
+    description: asset.description || "",
+    assetType: asset.assetType || "image",
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +33,62 @@ const AssetCard = ({ asset, onUpdated }) => {
   );
 
   const isManager = user?.role === "manager" || user?.role === "admin";
+  const firstVersion = asset.versions?.find(
+    (version) => version.versionNumber === 1,
+  );
+
+  const isAssetOwner =
+    user?.role === "artist" &&
+    firstVersion?.uploadedBy?._id?.toString() === user?._id?.toString();
+
+  const handleEdit = async () => {
+    if (!editForm.title.trim()) {
+      setError("Asset title is required.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      await updateAsset(asset._id, {
+        title: editForm.title,
+        description: editForm.description,
+        assetType: editForm.assetType,
+      });
+
+      setEditing(false);
+
+      await onUpdated();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to update asset.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this asset? All versions will also be deleted.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError("");
+
+      await deleteAsset(asset._id);
+
+      await onUpdated();
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to delete asset.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleUploadVersion = async () => {
     if (!selectedFile) {
@@ -95,9 +162,147 @@ const AssetCard = ({ asset, onUpdated }) => {
         borderRadius: "8px",
       }}
     >
-      <h3>{asset.title}</h3>
+      {editing ? (
+        <div>
+          <h3>Edit Asset</h3>
+          <input
+            type="text"
+            value={editForm.title}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                title: e.target.value,
+              })
+            }
+            placeholder="Asset title"
+          />
+          <br />
+          <br />
+          <textarea
+            value={editForm.description}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                description: e.target.value,
+              })
+            }
+            placeholder="Asset description"
+            rows={4}
+          />
+          <br />
+          <br />
+          <select
+            value={editForm.assetType}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                assetType: e.target.value,
+              })
+            }
+          >
+            <option value="image">Image</option>
+            <option value="design">Design</option>
+            <option value="document">Document</option>
+            <option value="video">Video</option>
+            <option value="other">Other</option>
+          </select>
+          <br />
+          <br />
+          <button onClick={handleEdit} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </button>{" "}
+          <button
+            onClick={() => {
+              setEditing(false);
+              setEditForm({
+                title: asset.title || "",
+                description: asset.description || "",
+                assetType: asset.assetType || "image",
+              });
+            }}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <>
+          <h3>{asset.title}</h3>
 
-      <p>{asset.description || "No description provided."}</p>
+          <p>{asset.description || "No description provided."}</p>
+        </>
+      )}
+
+      {editing ? (
+        <div>
+          <h3>Edit Asset</h3>
+          <input
+            type="text"
+            value={editForm.title}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                title: e.target.value,
+              })
+            }
+            placeholder="Asset title"
+          />
+          <br />
+          <br />
+          <textarea
+            value={editForm.description}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                description: e.target.value,
+              })
+            }
+            placeholder="Asset description"
+            rows={4}
+          />
+          <br />
+          <br />
+          <select
+            value={editForm.assetType}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                assetType: e.target.value,
+              })
+            }
+          >
+            <option value="image">Image</option>
+            <option value="design">Design</option>
+            <option value="document">Document</option>
+            <option value="video">Video</option>
+            <option value="other">Other</option>
+          </select>
+          <br />
+          <br />
+          <button onClick={handleEdit} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </button>{" "}
+          <button
+            onClick={() => {
+              setEditing(false);
+              setEditForm({
+                title: asset.title || "",
+                description: asset.description || "",
+                assetType: asset.assetType || "image",
+              });
+            }}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <>
+          <h3>{asset.title}</h3>
+
+          <p>{asset.description || "No description provided."}</p>
+        </>
+      )}
 
       <p>
         <strong>Current Version:</strong> v{asset.currentVersion}

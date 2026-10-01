@@ -1,8 +1,11 @@
+const dotenv = require("dotenv");
+
+dotenv.config();
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const dotenv = require("dotenv");
 
 const connectDB = require("./config/db");
 
@@ -11,8 +14,6 @@ const userRoutes = require("./routes/userRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const assetRoutes = require("./routes/assetRoutes");
 const commentRoutes = require("./routes/commentRoutes");
-
-dotenv.config();
 
 connectDB();
 
@@ -49,13 +50,9 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-
 app.use("/api/users", userRoutes);
-
 app.use("/api/projects", projectRoutes);
-
 app.use("/api/assets", assetRoutes);
-
 app.use("/api/comments", commentRoutes);
 
 app.use((req, res) => {

@@ -3,7 +3,11 @@ import { Link, useParams } from "react-router-dom";
 
 import { getProjectById } from "../services/projectService";
 
-import { getProjectAssets, getProjectProgress } from "../services/assetService";
+import {
+  getProjectAssets,
+  getProjectProgress,
+  createAsset,
+} from "../services/assetService";
 
 import { useAuth } from "../context/AuthContext";
 

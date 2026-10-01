@@ -44,9 +44,19 @@ router.get("/project/:projectId/progress", protect, getProjectProgress);
 
 router.get("/:id", protect, getAssetById);
 
-router.patch("/:id", protect, authorize("admin", "manager"), updateAsset);
+router.patch(
+  "/:id",
+  protect,
+  authorize("admin", "manager", "artist"),
+  updateAsset,
+);
 
-router.delete("/:id", protect, authorize("admin", "manager"), deleteAsset);
+router.delete(
+  "/:id",
+  protect,
+  authorize("admin", "manager", "artist"),
+  deleteAsset,
+);
 
 // ========================================
 // ASSET VERSIONS
