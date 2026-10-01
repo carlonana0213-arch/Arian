@@ -1,26 +1,41 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const isClient = user?.role?.includes('Reviewer') || user?.role?.includes('Client');
-  const isManager = user?.role?.includes('Manager');
+  const isManager = user?.role?.includes('Manager') || user?.role === 'Project Manager';
+  
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [logModal, setLogModal] = useState({ isOpen: false, type: 'approved' });
 
   const [metrics] = useState({ activeProjects: 4, pendingApprovals: 7, approvedAssets: 24, rejectedOutputs: 2 });
 
   const [activeTasks] = useState([
-    { id: 1, title: 'Nyota Walk Cycle Polish', project: 'Designer Series', deadline: 'Today, 5:00 PM', status: 'In Progress', priority: 'High' },
-    { id: 2, title: 'Arlecchino Combat Sequence', project: 'Promo Animation', deadline: 'Tomorrow', status: 'Review', priority: 'Urgent' },
+    { id: 1, title: 'Nyota Walk Cycle Polish', project: 'Designer Series', deadline: 'Today, 5:00 PM', status: 'In Progress', priority: 'High', projectId: 1 },
+    { id: 2, title: 'Arlecchino Combat Sequence', project: 'Promo Animation', deadline: 'Tomorrow', status: 'Review', priority: 'Urgent', projectId: 2 },
   ]);
 
   const [clientReviews] = useState([
-    { id: 1, title: 'Arlecchino Combat Sequence', project: 'Promo Animation', deadline: 'Awaiting Feedback', status: 'Review', priority: 'Urgent' },
+    { id: 1, title: 'Arlecchino Combat Sequence', project: 'Promo Animation', deadline: 'Awaiting Feedback', status: 'Review', priority: 'Urgent', projectId: 2 },
   ]);
 
   const displayedTasks = isClient ? clientReviews : activeTasks;
+
+  // Mock data for the new logs
+  const approvedLogs = [
+    { id: 1, asset: 'Zhongli_Burst_v2.mp4', project: 'Promo Animation', date: 'Today, 10:30 AM', by: 'Jane Director' },
+    { id: 2, asset: 'Lighting_Render_Final.png', project: 'Neon Rain', date: 'Yesterday, 2:15 PM', by: 'Oceania Rep' },
+    { id: 3, asset: 'Environment_Map_v4.exr', project: 'Neon Rain', date: 'Oct 28, 9:00 AM', by: 'Jane Director' },
+  ];
+
+  const rejectedLogs = [
+    { id: 1, asset: 'Hirono_Concept_v1.jpg', project: 'Designer Series', date: 'Today, 9:15 AM', by: 'Jane Director', reason: 'Colors too washed out' },
+    { id: 2, asset: 'Audio_Mix_v2.wav', project: 'Promo Animation', date: 'Oct 27, 4:45 PM', by: 'Oceania Rep', reason: 'Audio desync at 0:45 marker' },
+  ];
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full transition-colors duration-300 relative">
@@ -33,19 +48,34 @@ const Dashboard = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="glass-panel p-5 border-l-4 border-l-[#9d4edd]">
+        <div 
+          onClick={() => navigate('/projects')}
+          className="glass-panel p-5 border-l-4 border-l-[#9d4edd] cursor-pointer hover:bg-white/5 hover:-translate-y-1 transition-all duration-300"
+        >
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Active Projects</p>
           <p className="text-3xl font-bold text-white">{metrics.activeProjects}</p>
         </div>
-        <div className="glass-panel p-5 border-l-4 border-l-[#ffd166]">
+        
+        <div 
+          onClick={() => navigate('/projects')}
+          className="glass-panel p-5 border-l-4 border-l-[#ffd166] cursor-pointer hover:bg-white/5 hover:-translate-y-1 transition-all duration-300"
+        >
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Pending Approvals</p>
           <p className="text-3xl font-bold text-white">{metrics.pendingApprovals}</p>
         </div>
-        <div className="glass-panel p-5 border-l-4 border-l-[#10b981]">
+        
+        <div 
+          onClick={() => setLogModal({ isOpen: true, type: 'approved' })}
+          className="glass-panel p-5 border-l-4 border-l-[#10b981] cursor-pointer hover:bg-white/5 hover:-translate-y-1 transition-all duration-300"
+        >
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Approved Assets</p>
           <p className="text-3xl font-bold text-white">{metrics.approvedAssets}</p>
         </div>
-        <div className="glass-panel p-5 border-l-4 border-l-[#ff477e]">
+        
+        <div 
+          onClick={() => setLogModal({ isOpen: true, type: 'rejected' })}
+          className="glass-panel p-5 border-l-4 border-l-[#ff477e] cursor-pointer hover:bg-white/5 hover:-translate-y-1 transition-all duration-300"
+        >
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Rejected / Revisions</p>
           <p className="text-3xl font-bold text-white">{metrics.rejectedOutputs}</p>
         </div>
@@ -68,7 +98,11 @@ const Dashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-[#333333]">
                   {displayedTasks.map(task => (
-                    <tr key={task.id} className="text-white hover:bg-white/5 transition-colors cursor-pointer">
+                    <tr 
+                      key={task.id} 
+                      onClick={() => navigate(`/project/${task.projectId}`)}
+                      className="text-white hover:bg-white/5 transition-colors cursor-pointer"
+                    >
                       <td className="py-4">
                         <p className="font-semibold">{task.title}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{task.project}</p>
@@ -86,7 +120,10 @@ const Dashboard = () => {
         <div className="glass-panel p-6 flex flex-col">
           <h2 className="text-lg font-bold text-white mb-6">Recent Output Activity</h2>
           <div className="space-y-4 flex-1">
-            <div className="flex gap-4 p-3 bg-[#121212] rounded-lg border border-[#333333] hover:border-[#9d4edd] transition-colors cursor-pointer">
+            <div 
+              onClick={() => navigate('/project/1')}
+              className="flex gap-4 p-3 bg-[#121212] rounded-lg border border-[#333333] hover:border-[#9d4edd] transition-colors cursor-pointer"
+            >
               <div className="w-10 h-10 rounded bg-[#10b981]/20 text-[#10b981] flex items-center justify-center font-bold text-xs">REN</div>
               <div><p className="text-sm font-semibold text-white">Lighting Render</p><p className="text-xs text-gray-400 mt-1">Approved • 5h ago</p></div>
             </div>
@@ -97,11 +134,50 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* NEW ASSET LOG MODAL */}
+      {logModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="glass-panel w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
+            <div className="bg-[#1e1e1e] px-8 py-6 border-b border-[#333333] flex justify-between items-center shrink-0 shadow-md">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  {logModal.type === 'approved' ? 'Approved Assets Log' : 'Revisions & Rejections Log'}
+                  <span className={`text-xs px-2 py-0.5 rounded font-bold tracking-wider ${logModal.type === 'approved' ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ff477e]/20 text-[#ff477e]'}`}>
+                    {logModal.type === 'approved' ? metrics.approvedAssets : metrics.rejectedOutputs} TOTAL
+                  </span>
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">Recent quality control history.</p>
+              </div>
+              <button onClick={() => setLogModal({ isOpen: false, type: 'approved' })} className="w-8 h-8 rounded-full bg-[#121212] border border-[#333333] text-gray-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-0 bg-[#121212]">
+              <ul className="divide-y divide-[#333333]">
+                {(logModal.type === 'approved' ? approvedLogs : rejectedLogs).map((log) => (
+                  <li key={log.id} className="p-6 hover:bg-white/5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-white text-lg">{log.asset}</p>
+                      <p className="text-sm text-gray-400 mt-1">Project: <span className="text-gray-300">{log.project}</span></p>
+                      {log.reason && (
+                        <p className="text-sm text-[#ff477e] mt-2 font-medium">Feedback: {log.reason}</p>
+                      )}
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-sm text-gray-300 font-medium">{log.by}</p>
+                      <p className="text-xs text-gray-500 mt-1">{log.date}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULL REPORT MODAL */}
       {isReportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="glass-panel w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
-            
-            {/* THE FIX IS HERE: Changed bg-[#1e1e1e]/95 backdrop-blur to solid bg-[#1e1e1e] */}
             <div className="sticky top-0 bg-[#1e1e1e] px-8 py-6 border-b border-[#333333] flex justify-between items-center z-10 shadow-md">
               <div>
                 <h2 className="text-2xl font-bold text-white">Executive Production Report</h2>
