@@ -3,16 +3,24 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
 import { getProjectById } from "../services/projectService";
-import { getProjectAssets, getProjectProgress } from "../services/assetService";
-import { approveVersion, rejectVersion } from "../services/assetService";
+import {
+  getProjectAssets,
+  getProjectProgress,
+  approveVersion,
+  rejectVersion,
+} from "../services/assetService";
 const ProjectDetails = () => {
   const { id: projectId } = useParams();
   const { user } = useAuth();
   //project state
   const [project, setProject] = useState(null);
   const [assets, setAssets] = useState([]);
+  const [assetLoading, setAssetLoading] = useState(true);
+  const [assetError, setAssetError] = useState("");
+
   const [progress, setProgress] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Robust role checking
@@ -34,7 +42,10 @@ const ProjectDetails = () => {
   const loadProject = async () => {
     try {
       setLoading(true);
+      setAssetLoading(true);
+
       setError("");
+      setAssetError("");
 
       const [projectResponse, assetResponse, progressResponse] =
         await Promise.all([
@@ -44,12 +55,32 @@ const ProjectDetails = () => {
         ]);
 
       setProject(projectResponse.project);
+
       setAssets(assetResponse.assets || []);
+      const loadedAssets = assetResponse.assets || [];
+
+      setAssets(loadedAssets);
+
+      if (loadedAssets.length > 0) {
+        setSelectedAsset(loadedAssets[0]);
+        setSelectedAssetId(loadedAssets[0]._id);
+      } else {
+        setSelectedAsset(null);
+        setSelectedAssetId(null);
+      }
+
       setProgress(progressResponse);
     } catch (error) {
+      console.error("Failed to load project details:", error);
+
       setError(error.response?.data?.message || "Failed to load project.");
+
+      setAssetError(
+        error.response?.data?.message || "Failed to load project assets.",
+      );
     } finally {
       setLoading(false);
+      setAssetLoading(false);
     }
   };
 
@@ -107,8 +138,10 @@ const ProjectDetails = () => {
   };
 
   const handleApprove = async () => {
+    if (!selectedAsset) return;
+
     try {
-      await approveVersion(assets._id, assets.currentVersion);
+      await approveVersion(selectedAsset._id, selectedAsset.currentVersion);
 
       await loadProject();
 
@@ -122,37 +155,17 @@ const ProjectDetails = () => {
   };
 
   const handleRequestRevision = () => {
-    setAsset((prev) => ({ ...prev, status: "Needs Revision" }));
-    setComments([
-      ...comments,
-      {
-        id: Date.now(),
-        isSystem: true,
-        text: `Revision requested by ${user?.name}`,
-        type: "warning",
-      },
-    ]);
-    showNotification("Revision requested. Pipeline updated.", "warning");
+    showNotification(
+      "Revision requests will be connected to the asset review workflow.",
+      "warning",
+    );
   };
 
   const handleReject = async () => {
-    if (!reviewComment.trim()) {
-      showNotification("Please provide a reason for rejection.", "warning");
-      return;
-    }
-
-    try {
-      await rejectVersion(assets._id, assets.currentVersion, reviewComment);
-
-      await loadProject();
-
-      showNotification("Asset has been rejected.", "error");
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to reject asset.",
-        "error",
-      );
-    }
+    showNotification(
+      "Rejection comments will be connected in the review workflow.",
+      "warning",
+    );
   };
 
   const handlePostComment = (e) => {
@@ -252,22 +265,20 @@ const ProjectDetails = () => {
           </Link>
           <div className="h-4 w-px bg-[#333333]"></div>
           <h1 className="text-xl font-bold text-white">
-            Arlecchino Combat Sequence
+            {selectedAsset?.title || project?.name || "Project Details"}
           </h1>
 
           <span
             className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider border
-            ${
-              assets.status === "Approved"
-                ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
-                : assets.status === "Needs Revision"
-                  ? "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
-                  : assets.status === "Rejected"
-                    ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
-                    : "bg-[#9d4edd]/10 text-[#9d4edd] border-[#9d4edd]/30"
-            }`}
+  ${
+    selectedAsset?.currentVersion?.status === "approved"
+      ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
+      : selectedAsset?.currentVersion?.status === "rejected"
+        ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
+        : "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
+  }`}
           >
-            {assets.status}
+            {selectedAsset?.currentVersion?.status || "pending"}
           </span>
         </div>
 
@@ -284,7 +295,9 @@ const ProjectDetails = () => {
           {(isArtist || isManager) && (
             <button
               onClick={() => {
-                setSelectedAssetId(asset._id);
+                if (!selectedAsset) return;
+
+                setSelectedAssetId(selectedAsset._id);
                 setIsUploadModalOpen(true);
               }}
               className="btn-secondary py-1.5 px-4 text-sm"
@@ -293,7 +306,7 @@ const ProjectDetails = () => {
             </button>
           )}
 
-          {isManager && assets.currentVersion?.status === "pending" && (
+          {isManager && selectedAsset?.currentVersion?.status === "pending" && (
             <>
               <button
                 onClick={handleReject}
@@ -319,99 +332,182 @@ const ProjectDetails = () => {
           )}
         </div>
       </header>
-
-      <div className="flex-1 flex overflow-hidden">
-        {/* Main Asset View */}
-        <div className="flex-1 bg-[#121212] p-8 flex flex-col items-center overflow-y-auto">
-          <div className="w-full max-w-5xl aspect-video bg-[#0a0a0a] rounded-lg border border-[#333333] flex items-center justify-center relative overflow-hidden group shadow-2xl shrink-0">
-            <span className="text-gray-500 font-mono text-lg">
-              Asset Preview (Video/Image Render)
-            </span>
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="h-1 w-full bg-gray-700 rounded-full mb-3 overflow-hidden">
-                <div className="h-full bg-[#ff477e] w-1/3"></div>
-              </div>
-              <div className="flex justify-between text-xs text-gray-300 font-mono">
-                <span>00:01:24:12</span>
-                <span>00:03:00:00</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Restructured Layout: Description/Metadata on Left, Version Tracker on Right */}
-          <div className="w-full max-w-5xl mt-8 flex flex-col md:flex-row justify-between items-start gap-8 pb-12">
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold text-white">{assets.name}</h2>
-              <p className="text-sm text-[#9d4edd] font-medium mt-1">
-                Uploaded by {assets.uploadedBy}{" "}
-                <span className="text-gray-500 font-normal">
-                  • {assets.uploadDate}
-                </span>
-              </p>
-
-              <div className="mt-6 mb-6">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                  Asset Description
-                </h3>
-                <p className="text-sm text-gray-300 leading-relaxed max-w-3xl">
-                  This iteration focuses on the heavy impact frames of the burst
-                  animation. Adjusted the particle effects during the initial
-                  cast and smoothed out the recovery frames to match the new
-                  24fps timeline. Ensure the lighting highlights align with the
-                  updated environment maps.
-                </p>
-              </div>
-
-              {/* Clean Grid Layout for Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 bg-[#1a1a1a] border border-[#333333] rounded-xl p-5 shadow-inner max-w-2xl">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-                    Format
-                  </p>
-                  <p className="text-sm text-white font-mono mt-0.5">
-                    H.264 (.mp4)
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-                    Size
-                  </p>
-                  <p className="text-sm text-white font-mono mt-0.5">45.2 MB</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-                    Resolution
-                  </p>
-                  <p className="text-sm text-white font-mono mt-0.5">
-                    1920x1080
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-                    Frame Rate
-                  </p>
-                  <p className="text-sm text-white font-mono mt-0.5">24 FPS</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full md:w-64 shrink-0 flex flex-col items-start md:items-end">
-              <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">
-                Version History Tracker
-              </p>
-              <select
-                value={assets.version}
-                onChange={(e) =>
-                  setAsset({ ...asset, version: e.target.value })
-                }
-                className="bg-[#1e1e1e] text-white border border-[#333333] text-sm rounded-lg px-4 py-2.5 outline-none focus:border-[#ffd166] cursor-pointer w-full shadow-sm"
+      {!assetLoading && assets.length > 0 && (
+        <div className="w-full bg-[#1e1e1e] border-b border-[#333333] px-8 py-3">
+          <div className="max-w-5xl mx-auto flex items-center gap-3 overflow-x-auto">
+            {assets.map((asset) => (
+              <button
+                key={asset._id}
+                onClick={() => {
+                  setSelectedAsset(asset);
+                  setSelectedAssetId(asset._id);
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  selectedAsset?._id === asset._id
+                    ? "bg-[#9d4edd] text-white"
+                    : "bg-[#121212] text-gray-400 border border-[#333333] hover:text-white"
+                }`}
               >
-                <option value="v2">Version 2 (Current)</option>
-                <option value="v1">Version 1 (Rejected)</option>
-              </select>
-            </div>
+                {asset.title}
+              </button>
+            ))}
           </div>
         </div>
+      )}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Asset View */}
+        {assetLoading ? (
+          <div className="w-full flex-1 flex items-center justify-center">
+            <p className="text-gray-400">Loading assets...</p>
+          </div>
+        ) : assetError ? (
+          <div className="w-full flex-1 flex items-center justify-center">
+            <p className="text-[#ff477e]">{assetError}</p>
+          </div>
+        ) : assets.length === 0 ? (
+          <div className="w-full flex-1 flex items-center justify-center">
+            <p className="text-gray-400">
+              No assets have been uploaded to this project yet.
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 bg-[#121212] p-8 flex flex-col items-center overflow-y-auto">
+            <div className="w-full max-w-5xl aspect-video bg-[#0a0a0a] rounded-lg border border-[#333333] flex items-center justify-center relative overflow-hidden group shadow-2xl shrink-0">
+              {selectedAsset?.currentVersion?.fileUrl ? (
+                <img
+                  src={selectedAsset.currentVersion.fileUrl}
+                  alt={selectedAsset.title}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span className="text-gray-500 font-mono text-lg">
+                  No asset preview available
+                </span>
+              )}
+            </div>
+
+            {/* Restructured Layout: Description/Metadata on Left, Version Tracker on Right */}
+            <div className="w-full max-w-5xl mt-8 flex flex-col md:flex-row justify-between items-start gap-8 pb-12">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold text-white">
+                  {selectedAsset?.title || "Untitled Asset"}
+                </h2>
+
+                <p className="text-sm text-[#9d4edd] font-medium mt-1">
+                  Uploaded by{" "}
+                  {selectedAsset?.currentVersion?.uploadedBy
+                    ? `${selectedAsset.currentVersion.uploadedBy.firstName} ${selectedAsset.currentVersion.uploadedBy.lastName}`
+                    : "Unknown"}
+                  <span className="text-gray-500 font-normal">
+                    {" "}
+                    •{" "}
+                    {selectedAsset?.currentVersion?.uploadedAt
+                      ? new Date(
+                          selectedAsset.currentVersion.uploadedAt,
+                        ).toLocaleDateString()
+                      : "Unknown date"}
+                  </span>
+                </p>
+
+                <div className="mt-6 mb-6">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Asset Description
+                  </h3>
+                  <p className="text-sm text-gray-300 leading-relaxed max-w-3xl">
+                    This iteration focuses on the heavy impact frames of the
+                    burst animation. Adjusted the particle effects during the
+                    initial cast and smoothed out the recovery frames to match
+                    the new 24fps timeline. Ensure the lighting highlights align
+                    with the updated environment maps.
+                  </p>
+                </div>
+
+                {/* Clean Grid Layout for Metadata */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 bg-[#1a1a1a] border border-[#333333] rounded-xl p-5 shadow-inner max-w-2xl">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                      Asset Type
+                    </p>
+
+                    <p className="text-sm text-white font-mono mt-0.5">
+                      {selectedAsset?.assetType || "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                      Version
+                    </p>
+
+                    <p className="text-sm text-white font-mono mt-0.5">
+                      {selectedAsset?.currentVersion
+                        ? `v${selectedAsset.currentVersion}`
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                      Status
+                    </p>
+
+                    <p className="text-sm text-white font-mono mt-0.5 capitalize">
+                      {selectedAsset?.currentVersion?.status || "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                      Versions
+                    </p>
+
+                    <p className="text-sm text-white font-mono mt-0.5">
+                      {selectedAsset?.versions?.length || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full md:w-64 shrink-0 flex flex-col items-start md:items-end">
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">
+                  Version History Tracker
+                </p>
+                <select
+                  value={selectedAsset?.currentVersion || ""}
+                  onChange={(e) => {
+                    const versionNumber = Number(e.target.value);
+
+                    if (!selectedAsset) return;
+
+                    const selectedVersion = selectedAsset.versions?.find(
+                      (version) => version.versionNumber === versionNumber,
+                    );
+
+                    if (selectedVersion) {
+                      setSelectedAsset({
+                        ...selectedAsset,
+                        currentVersion: versionNumber,
+                      });
+                    }
+                  }}
+                  className="bg-[#1e1e1e] text-white border border-[#333333] text-sm rounded-lg px-4 py-2.5 outline-none focus:border-[#ffd166] cursor-pointer w-full shadow-sm"
+                >
+                  {selectedAsset?.versions?.map((version) => (
+                    <option
+                      key={version.versionNumber}
+                      value={version.versionNumber}
+                    >
+                      Version {version.versionNumber}
+                      {version.versionNumber === selectedAsset.currentVersion
+                        ? " (Current)"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sidebar */}
         <div className="w-96 bg-[#1e1e1e] border-l border-[#333333] flex flex-col z-10 shadow-xl">
