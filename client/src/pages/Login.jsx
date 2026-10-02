@@ -64,7 +64,7 @@ const Login = () => {
           <div className="mb-10">
             <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
             <p className="text-gray-400 text-sm">
-              Sign in to AnimTrackr to continue.
+              Sign in to Arian to continue.
             </p>
           </div>
           {error && (

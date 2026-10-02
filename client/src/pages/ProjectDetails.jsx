@@ -108,7 +108,7 @@ const ProjectDetails = () => {
 
   const handleApprove = async () => {
     try {
-      await approveVersion(asset._id, asset.currentVersion);
+      await approveVersion(assets._id, assets.currentVersion);
 
       await loadProject();
 
@@ -142,7 +142,7 @@ const ProjectDetails = () => {
     }
 
     try {
-      await rejectVersion(asset._id, asset.currentVersion, reviewComment);
+      await rejectVersion(assets._id, assets.currentVersion, reviewComment);
 
       await loadProject();
 
@@ -258,16 +258,16 @@ const ProjectDetails = () => {
           <span
             className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider border
             ${
-              asset.status === "Approved"
+              assets.status === "Approved"
                 ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
-                : asset.status === "Needs Revision"
+                : assets.status === "Needs Revision"
                   ? "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
-                  : asset.status === "Rejected"
+                  : assets.status === "Rejected"
                     ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
                     : "bg-[#9d4edd]/10 text-[#9d4edd] border-[#9d4edd]/30"
             }`}
           >
-            {asset.status}
+            {assets.status}
           </span>
         </div>
 
@@ -293,7 +293,7 @@ const ProjectDetails = () => {
             </button>
           )}
 
-          {isManager && currentVersion?.status === "pending" && (
+          {isManager && assets.currentVersion?.status === "pending" && (
             <>
               <button
                 onClick={handleReject}
@@ -341,11 +341,11 @@ const ProjectDetails = () => {
           {/* Restructured Layout: Description/Metadata on Left, Version Tracker on Right */}
           <div className="w-full max-w-5xl mt-8 flex flex-col md:flex-row justify-between items-start gap-8 pb-12">
             <div className="flex-1">
-              <h2 className="text-3xl font-bold text-white">{asset.name}</h2>
+              <h2 className="text-3xl font-bold text-white">{assets.name}</h2>
               <p className="text-sm text-[#9d4edd] font-medium mt-1">
-                Uploaded by {asset.uploadedBy}{" "}
+                Uploaded by {assets.uploadedBy}{" "}
                 <span className="text-gray-500 font-normal">
-                  • {asset.uploadDate}
+                  • {assets.uploadDate}
                 </span>
               </p>
 
@@ -400,7 +400,7 @@ const ProjectDetails = () => {
                 Version History Tracker
               </p>
               <select
-                value={asset.version}
+                value={assets.version}
                 onChange={(e) =>
                   setAsset({ ...asset, version: e.target.value })
                 }

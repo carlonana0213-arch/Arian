@@ -56,7 +56,6 @@ const Projects = () => {
       await createProject({
         name: newProject.title,
         description: newProject.description,
-        startDate: newProject.startDate || undefined,
         deadline: newProject.deadline,
         status: "planning",
       });
@@ -79,15 +78,25 @@ const Projects = () => {
     }
   };
 
-  const handleStatusChange = (e, projectId) => {
+  const handleStatusChange = async (e, projectId) => {
     e.preventDefault();
     e.stopPropagation();
 
-    setProjects(
-      projects.map((p) =>
-        p.id === projectId ? { ...p, status: e.target.value } : p,
-      ),
-    );
+    const newStatus = e.target.value;
+
+    try {
+      setError("");
+
+      await updateProject(projectId, {
+        status: newStatus,
+      });
+
+      await loadProjects();
+    } catch (error) {
+      setError(
+        error.response?.data?.message || "Failed to update project status.",
+      );
+    }
   };
 
   return (
@@ -112,33 +121,32 @@ const Projects = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Link
-            key={project.id}
+            key={project._id}
             to={`/project/${project._id}`}
             className="glass-panel p-6 hover:border-[#9d4edd] transition-all duration-300 group block no-underline flex flex-col h-full hover:-translate-y-1"
           >
             <div className="flex justify-between items-start mb-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-[#9d4edd]">
-                {project.client}
+                {project.client
+                  ? `${project.client.firstName} ${project.client.lastName}`
+                  : "No Client Assigned"}
               </span>
-
               {/* RESTRICTED STATUS TOGGLE */}
               {isManager ? (
                 <div className="relative">
                   <select
                     value={project.status}
-                    onChange={(e) => handleStatusChange(e, project.id)}
+                    onChange={(e) => handleStatusChange(e, project._id)}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                     }}
                     className="text-xs px-3 py-1 rounded font-medium bg-[#1e1e1e] border border-[#333333] text-gray-400 focus:outline-none focus:border-[#ffd166] cursor-pointer appearance-none hover:bg-white/5 transition-colors pr-6 shadow-sm relative z-20"
                   >
-                    <option value="Planning">Planning</option>
-                    <option value="In Production">In Production</option>
-                    <option value="Pending Review">Pending Review</option>
-                    <option value="Approved">Approved</option>
-                    <option value="On Hold">On Hold</option>
-                    <option value="Completed">Completed</option>
+                    <option value="planning">Planning</option>
+                    <option value="active">In Production</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
                   </select>
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-[8px]">
                     ▼
@@ -152,27 +160,30 @@ const Projects = () => {
             </div>
 
             <h2 className="text-xl font-bold text-white mb-2 group-hover:text-[#9d4edd] transition-colors">
-              {project.title}
+              {project.name}
             </h2>
 
             <div className="flex items-center gap-2 mb-6">
-              <span
-                className={`w-2 h-2 rounded-full ${project.priority === "Urgent" ? "bg-[#ff477e]" : project.priority === "High" ? "bg-[#ffd166]" : "bg-gray-400"}`}
-              ></span>
+              <span className="w-2 h-2 rounded-full bg-[#9d4edd]"></span>
+
               <span className="text-xs text-gray-400">
-                {project.priority} Priority • Last updated {project.lastActive}
+                Created{" "}
+                {project.createdAt
+                  ? new Date(project.createdAt).toLocaleDateString()
+                  : "—"}
               </span>
             </div>
 
             <div className="mt-auto">
               <div className="w-full bg-[#121212] rounded-full h-1.5 mb-2 overflow-hidden border border-[#333333]">
                 <div
-                  className="bg-gradient-to-r from-[#9d4edd] to-[#ff477e] h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${project.progress}%` }}
+                  className="bg-gradient-to-r from-[#9d4edd] to-[#ff477e] h-1.5 rounded-full"
+                  style={{ width: "0%" }}
                 ></div>
               </div>
+
               <div className="text-right text-xs text-gray-400 font-mono">
-                {project.progress}% Completed
+                Asset progress will appear here
               </div>
             </div>
           </Link>
@@ -239,7 +250,6 @@ const Projects = () => {
                   </label>
                   <input
                     type="text"
-                    required
                     value={newProject.client}
                     onChange={(e) =>
                       setNewProject({ ...newProject, client: e.target.value })
@@ -253,7 +263,6 @@ const Projects = () => {
                   </label>
                   <input
                     type="date"
-                    required
                     value={newProject.deadline}
                     onChange={(e) =>
                       setNewProject({ ...newProject, deadline: e.target.value })
