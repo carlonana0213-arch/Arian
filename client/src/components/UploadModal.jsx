@@ -4,10 +4,11 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
   const [note, setNote] = useState("");
-
-  if (!isOpen) return null;
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  if (!isOpen) return null;
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -38,6 +39,12 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
     e.preventDefault();
 
     if (!file) {
+      setError("Please select a file.");
+      return;
+    }
+
+    if (!assetId) {
+      setError("No asset was selected for this revision.");
       return;
     }
 
@@ -112,7 +119,7 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
                   Click to upload or drag and drop
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  MP4, MOV, PNG or JPG (max. 500MB)
+                  PNG, JPG or WebP (max. 10MB)
                 </p>
               </>
             )}

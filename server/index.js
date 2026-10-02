@@ -3,6 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
+dotenv.config();
 
 const connectDB = require("./config/db");
 
@@ -11,8 +12,6 @@ const userRoutes = require("./routes/userRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const assetRoutes = require("./routes/assetRoutes");
 const commentRoutes = require("./routes/commentRoutes");
-
-dotenv.config();
 
 connectDB();
 

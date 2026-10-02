@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
-import { getProjectById } from "../services/projectService";
+import CreateAssetModal from "../components/CreateAssetModal";
+import { getProjectById, updateProject } from "../services/projectService";
 import {
   getProjectAssets,
   getProjectProgress,
@@ -21,6 +22,7 @@ const ProjectDetails = () => {
   const [progress, setProgress] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Robust role checking
@@ -32,6 +34,7 @@ const ProjectDetails = () => {
 
   const [activeTab, setActiveTab] = useState("comments");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isCreateAssetModalOpen, setIsCreateAssetModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [toast, setToast] = useState(null);
@@ -56,17 +59,20 @@ const ProjectDetails = () => {
 
       setProject(projectResponse.project);
 
-      setAssets(assetResponse.assets || []);
       const loadedAssets = assetResponse.assets || [];
 
       setAssets(loadedAssets);
 
       if (loadedAssets.length > 0) {
-        setSelectedAsset(loadedAssets[0]);
-        setSelectedAssetId(loadedAssets[0]._id);
+        const firstAsset = loadedAssets[0];
+
+        setSelectedAsset(firstAsset);
+        setSelectedAssetId(firstAsset._id);
+        setSelectedVersionNumber(firstAsset.currentVersion);
       } else {
         setSelectedAsset(null);
         setSelectedAssetId(null);
+        setSelectedVersionNumber(null);
       }
 
       setProgress(progressResponse);
@@ -87,6 +93,30 @@ const ProjectDetails = () => {
   useEffect(() => {
     loadProject();
   }, [projectId]);
+
+  const handleProjectStatusChange = async (newStatus) => {
+    if (!project) return;
+
+    try {
+      await updateProject(project._id, {
+        status: newStatus,
+      });
+
+      await loadProject();
+
+      showNotification("Project status updated.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to update project status.",
+        "error",
+      );
+    }
+  };
+
+  const selectedVersion =
+    selectedAsset?.versions?.find(
+      (version) => version.versionNumber === selectedVersionNumber,
+    ) || null;
 
   const [teamMembers, setTeamMembers] = useState([
     {
@@ -267,18 +297,38 @@ const ProjectDetails = () => {
           <h1 className="text-xl font-bold text-white">
             {selectedAsset?.title || project?.name || "Project Details"}
           </h1>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+              Project Status
+            </p>
+
+            <p className="text-sm text-white font-mono mt-0.5 capitalize">
+              {isManager && project && (
+                <select
+                  value={project.status}
+                  onChange={(e) => handleProjectStatusChange(e.target.value)}
+                  className="bg-[#121212] text-white border border-[#333333] rounded-md px-3 py-1.5 text-sm outline-none focus:border-[#9d4edd]"
+                >
+                  <option value="planning">Planning</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
+                </select>
+              )}
+            </p>
+          </div>
 
           <span
             className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider border
   ${
-    selectedAsset?.currentVersion?.status === "approved"
+    selectedVersion?.status === "approved"
       ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
-      : selectedAsset?.currentVersion?.status === "rejected"
+      : selectedVersion?.status === "rejected"
         ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
         : "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
   }`}
           >
-            {selectedAsset?.currentVersion?.status || "pending"}
+            {selectedVersion?.status || "pending"}
           </span>
         </div>
 
@@ -291,7 +341,14 @@ const ProjectDetails = () => {
               <span>⚙</span> Manage Team
             </button>
           )}
-
+          {isManager && (
+            <button
+              onClick={() => setIsCreateAssetModalOpen(true)}
+              className="btn-primary py-1.5 px-4 text-sm"
+            >
+              + New Asset
+            </button>
+          )}
           {(isArtist || isManager) && (
             <button
               onClick={() => {
@@ -306,7 +363,7 @@ const ProjectDetails = () => {
             </button>
           )}
 
-          {isManager && selectedAsset?.currentVersion?.status === "pending" && (
+          {isManager && selectedVersion?.status === "pending" && (
             <>
               <button
                 onClick={handleReject}
@@ -341,6 +398,7 @@ const ProjectDetails = () => {
                 onClick={() => {
                   setSelectedAsset(asset);
                   setSelectedAssetId(asset._id);
+                  setSelectedVersionNumber(asset.currentVersion);
                 }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   selectedAsset?._id === asset._id
@@ -373,11 +431,14 @@ const ProjectDetails = () => {
         ) : (
           <div className="flex-1 bg-[#121212] p-8 flex flex-col items-center overflow-y-auto">
             <div className="w-full max-w-5xl aspect-video bg-[#0a0a0a] rounded-lg border border-[#333333] flex items-center justify-center relative overflow-hidden group shadow-2xl shrink-0">
-              {selectedAsset?.currentVersion?.fileUrl ? (
+              {selectedVersion?.fileUrl ? (
                 <img
-                  src={selectedAsset.currentVersion.fileUrl}
-                  alt={selectedAsset.title}
+                  src={selectedVersion.fileUrl}
+                  alt={selectedAsset?.title || "Asset preview"}
                   className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
                 />
               ) : (
                 <span className="text-gray-500 font-mono text-lg">
@@ -395,15 +456,15 @@ const ProjectDetails = () => {
 
                 <p className="text-sm text-[#9d4edd] font-medium mt-1">
                   Uploaded by{" "}
-                  {selectedAsset?.currentVersion?.uploadedBy
-                    ? `${selectedAsset.currentVersion.uploadedBy.firstName} ${selectedAsset.currentVersion.uploadedBy.lastName}`
+                  {selectedVersion?.uploadedBy
+                    ? `${selectedVersion.uploadedBy.firstName} ${selectedVersion.uploadedBy.lastName}`
                     : "Unknown"}
                   <span className="text-gray-500 font-normal">
                     {" "}
                     •{" "}
-                    {selectedAsset?.currentVersion?.uploadedAt
+                    {selectedVersion?.uploadedAt
                       ? new Date(
-                          selectedAsset.currentVersion.uploadedAt,
+                          selectedVersion.uploadedAt,
                         ).toLocaleDateString()
                       : "Unknown date"}
                   </span>
@@ -414,11 +475,7 @@ const ProjectDetails = () => {
                     Asset Description
                   </h3>
                   <p className="text-sm text-gray-300 leading-relaxed max-w-3xl">
-                    This iteration focuses on the heavy impact frames of the
-                    burst animation. Adjusted the particle effects during the
-                    initial cast and smoothed out the recovery frames to match
-                    the new 24fps timeline. Ensure the lighting highlights align
-                    with the updated environment maps.
+                    {selectedAsset?.description || "No description provided."}
                   </p>
                 </div>
 
@@ -452,7 +509,7 @@ const ProjectDetails = () => {
                     </p>
 
                     <p className="text-sm text-white font-mono mt-0.5 capitalize">
-                      {selectedAsset?.currentVersion?.status || "—"}
+                      {selectedVersion?.status || "—"}
                     </p>
                   </div>
 
@@ -473,22 +530,9 @@ const ProjectDetails = () => {
                   Version History Tracker
                 </p>
                 <select
-                  value={selectedAsset?.currentVersion || ""}
+                  value={selectedVersionNumber || ""}
                   onChange={(e) => {
-                    const versionNumber = Number(e.target.value);
-
-                    if (!selectedAsset) return;
-
-                    const selectedVersion = selectedAsset.versions?.find(
-                      (version) => version.versionNumber === versionNumber,
-                    );
-
-                    if (selectedVersion) {
-                      setSelectedAsset({
-                        ...selectedAsset,
-                        currentVersion: versionNumber,
-                      });
-                    }
+                    setSelectedVersionNumber(Number(e.target.value));
                   }}
                   className="bg-[#1e1e1e] text-white border border-[#333333] text-sm rounded-lg px-4 py-2.5 outline-none focus:border-[#ffd166] cursor-pointer w-full shadow-sm"
                 >
@@ -675,6 +719,13 @@ const ProjectDetails = () => {
         onClose={() => setIsUploadModalOpen(false)}
         assetId={selectedAssetId}
         onUploaded={loadProject}
+      />
+
+      <CreateAssetModal
+        isOpen={isCreateAssetModalOpen}
+        onClose={() => setIsCreateAssetModalOpen(false)}
+        projectId={projectId}
+        onCreated={loadProject}
       />
 
       {isTeamModalOpen && (
