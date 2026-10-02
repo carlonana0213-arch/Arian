@@ -1,24 +1,48 @@
-import { createContext, useState, useContext } from 'react';
+import { createContext, useContext, useState } from "react";
+
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  getStoredUser,
+} from "../services/authService";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(getStoredUser());
 
-  const login = (userData) => {
-    setUser({
-      name: userData.name || 'Studio User',
-      email: userData.email,
-      role: userData.role || 'Artist / Animator'
-    });
+  const login = async (credentials) => {
+    const data = await loginUser(credentials);
+
+    setUser(data.user);
+
+    return data;
+  };
+
+  const register = async (userData) => {
+    const data = await registerUser(userData);
+
+    setUser(data.user);
+
+    return data;
   };
 
   const logout = () => {
+    logoutUser();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        isAuthenticated: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
