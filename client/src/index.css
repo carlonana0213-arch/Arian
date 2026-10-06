@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-[#f3f4f6] font-sans antialiased overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-[#121212]/90 backdrop-blur-md border border-[#333333] rounded-xl shadow-lg;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-[#9d4edd] to-[#ff477e] text-white font-bold rounded-md hover:opacity-90 transition-opacity shadow-md border-none cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border border-[#333333] text-[#f3f4f6] hover:bg-[#1e1e1e] hover:border-[#ffd166] rounded-md font-bold transition-all cursor-pointer;
+  }
+}
+
+/* Custom Theme Variables */
+:root {
+  --color-studio-base: #121212;
+  --color-studio-surface: #1e1e1e;
+  --color-studio-border: #333333;
+  --color-studio-text: #f3f4f6;
+  --color-studio-muted: #9ca3af;
+  --color-accent-purple: #9d4edd;
+  --color-accent-pink: #ff477e;
+  --color-accent-yellow: #ffd166;
+  --color-status-approved: #10b981;
+}
+
+/* LIGHT MODE GLOBAL OVERRIDES */
+[data-theme='light'] body,
+[data-theme='light'] .bg-\[\#0a0a0a\] {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+[data-theme='light'] .bg-\[\#121212\],
+[data-theme='light'] .bg-\[\#1a1a1a\] {
+  background-color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-\[\#1e1e1e\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .border-\[\#333333\],
+[data-theme='light'] .border-\[\#1e1e1e\] {
+  border-color: #e5e7eb !important;
+}
+
+[data-theme='light'] .text-white {
+  color: #111827 !important;
+}
+
+[data-theme='light'] .text-gray-400, 
+[data-theme='light'] .text-gray-500, 
+[data-theme='light'] .text-gray-300 {
+  color: #4b5563 !important;
+}
+
+[data-theme='light'] .glass-panel {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .btn-secondary {
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+
+[data-theme='light'] .btn-secondary:hover {
+  background-color: #f3f4f6 !important;
+  border-color: #9d4edd !important;
+}
+
+[data-theme='light'] input, 
+[data-theme='light'] select, 
+[data-theme='light'] textarea {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
