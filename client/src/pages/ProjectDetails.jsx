@@ -3,12 +3,21 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
 import CreateAssetModal from "../components/CreateAssetModal";
+
+import {
+  getAssetTasks,
+  updateTask,
+  createTask,
+  deleteTask,
+} from "../services/taskService";
+
 import {
   addProjectMember,
   removeProjectMember,
   getProjectById,
   updateProject,
 } from "../services/projectService";
+
 import {
   getProjectAssets,
   getProjectProgress,
@@ -52,6 +61,11 @@ const ProjectDetails = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [toast, setToast] = useState(null);
+
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
 
   const [newComment, setNewComment] = useState("");
   const commentsEndRef = useRef(null);
@@ -171,22 +185,6 @@ const ProjectDetails = () => {
       initials: "JD",
       text: "The lighting in the background looks great, but can we fix the timing on the walk cycle?",
       time: "10 mins ago",
-    },
-  ]);
-
-  // Task Management State
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      text: "Fix timing on walk cycle",
-      assignee: "France",
-      completed: false,
-    },
-    {
-      id: 2,
-      text: "Update background lighting",
-      assignee: "Artist A",
-      completed: true,
     },
   ]);
 
@@ -816,11 +814,7 @@ const ProjectDetails = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-colors duration-300 p-4">
           <div className="glass-panel w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
-              onClick={() => {
-                setIsTeamModalOpen(false);
-                setSelectedMemberId("");
-                setSelectedMemberRole("artist");
-              }}
+              onClick={() => setIsTeamModalOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
             >
               ✕

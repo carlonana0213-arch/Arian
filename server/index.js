@@ -12,6 +12,7 @@ const userRoutes = require("./routes/userRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const assetRoutes = require("./routes/assetRoutes");
 const commentRoutes = require("./routes/commentRoutes");
+const taskRoutes = require("./routes/taskRoutes");
 
 connectDB();
 
@@ -56,6 +57,8 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/assets", assetRoutes);
 
 app.use("/api/comments", commentRoutes);
+
+app.use("/api/tasks", taskRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
