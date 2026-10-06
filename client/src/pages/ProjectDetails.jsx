@@ -246,25 +246,49 @@ const ProjectDetails = () => {
     );
   };
 
-  const handleAddMember = (e) => {
-    e.preventDefault();
-    if (!newMemberEmail) return;
-    setTeamMembers([
-      ...teamMembers,
-      {
-        id: Date.now(),
-        name: newMemberEmail.split("@")[0],
-        role: "Artist / Animator",
-        email: newMemberEmail,
-      },
-    ]);
-    setNewMemberEmail("");
-    showNotification(`Added ${newMemberEmail} to the project team.`);
+  const handleAddMember = async () => {
+    if (!selectedMemberId) {
+      showNotification("Please select a user.", "warning");
+      return;
+    }
+
+    try {
+      setMemberLoading(true);
+
+      await addProjectMember(projectId, selectedMemberId, selectedMemberRole);
+
+      await loadProject();
+
+      setSelectedMemberId("");
+
+      showNotification("Team member added successfully.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to add team member.",
+        "error",
+      );
+    } finally {
+      setMemberLoading(false);
+    }
   };
 
-  const handleRemoveMember = (idToRemove) => {
-    setTeamMembers(teamMembers.filter((member) => member.id !== idToRemove));
-    showNotification("Team member removed from project.");
+  const handleRemoveMember = async (userId) => {
+    try {
+      setMemberLoading(true);
+
+      await removeProjectMember(projectId, userId);
+
+      await loadProject();
+
+      showNotification("Team member removed.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to remove team member.",
+        "error",
+      );
+    } finally {
+      setMemberLoading(false);
+    }
   };
 
   const handleAddTask = (e) => {
@@ -387,15 +411,14 @@ const ProjectDetails = () => {
             {selectedVersion?.status || "pending"}
           </span>
 
-          {isManager ||
-            (isAdmin && (
-              <button
-                onClick={() => setIsTeamModalOpen(true)}
-                className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
-              >
-                <span>⚙</span> Manage Team
-              </button>
-            ))}
+          {(isManager || isAdmin) && (
+            <button
+              onClick={() => setIsTeamModalOpen(true)}
+              className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
+            >
+              <span>⚙</span> Manage Team
+            </button>
+          )}
           {(isManager || isArtist) && (
             <button
               onClick={() => setIsCreateAssetModalOpen(true)}
