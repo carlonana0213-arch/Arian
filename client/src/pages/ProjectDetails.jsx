@@ -294,9 +294,9 @@ const ProjectDetails = () => {
             &larr; Back
           </Link>
           <div className="h-4 w-px bg-[#333333]"></div>
-          <h1 className="text-xl font-bold text-white">
+          {/*  <h1 className="text-xl font-bold text-white">
             {selectedAsset?.title || project?.name || "Project Details"}
-          </h1>
+          </h1>*/}
           <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
               Project Status
@@ -317,7 +317,35 @@ const ProjectDetails = () => {
               )}
             </p>
           </div>
+          <div className="w-full max-w-5xl mb-8">
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest">
+                  Project Progress
+                  <span className="text-sm font-bold text-white">
+                    {progress?.progress || 0}%
+                  </span>
+                </p>
 
+                <p className="text-sm text-gray-500 mt-1">
+                  {progress?.approvedAssets || 0} of{" "}
+                  {progress?.totalAssets || 0} assets approved
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full bg-[#1e1e1e] border border-[#333333] rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-[#9d4edd] to-[#ff477e] h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${progress?.progress || 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 items-center">
           <span
             className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider border
   ${
@@ -330,9 +358,7 @@ const ProjectDetails = () => {
           >
             {selectedVersion?.status || "pending"}
           </span>
-        </div>
 
-        <div className="flex gap-3 items-center">
           {isManager && (
             <button
               onClick={() => setIsTeamModalOpen(true)}

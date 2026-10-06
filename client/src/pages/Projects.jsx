@@ -6,6 +6,7 @@ import {
   createProject,
   updateProject,
 } from "../services/projectService";
+import { getProjectProgress } from "../services/assetService";
 const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,10 +16,11 @@ const Projects = () => {
 
   // ROLE CHECKS
 
-  const isClient =
-    user?.role?.includes("Reviewer") || user?.role?.includes("Client");
+  const isClient = user?.role === "client";
   const isManager =
-    user?.role?.includes("Manager") || user?.role === "Project Manager";
+    user?.role?.includes("manager") ||
+    user?.role === "manager" ||
+    user?.role === "admin ";
 
   const loadProjects = async () => {
     try {
@@ -26,8 +28,36 @@ const Projects = () => {
       setError("");
 
       const data = await getProjects();
+      const loadedProjects = data.projects || [];
 
-      setProjects(data.projects || []);
+      const projectsWithProgress = await Promise.all(
+        loadedProjects.map(async (project) => {
+          try {
+            const progressData = await getProjectProgress(project._id);
+
+            return {
+              ...project,
+              progressData,
+            };
+          } catch (error) {
+            console.error(
+              `Failed to load progress for project ${project._id}:`,
+              error,
+            );
+
+            return {
+              ...project,
+              progressData: {
+                progress: 0,
+                totalAssets: 0,
+                approvedAssets: 0,
+              },
+            };
+          }
+        }),
+      );
+
+      setProjects(projectsWithProgress);
     } catch (error) {
       setError(error.response?.data?.message || "Failed to load projects.");
     } finally {
@@ -178,12 +208,14 @@ const Projects = () => {
               <div className="w-full bg-[#121212] rounded-full h-1.5 mb-2 overflow-hidden border border-[#333333]">
                 <div
                   className="bg-gradient-to-r from-[#9d4edd] to-[#ff477e] h-1.5 rounded-full"
-                  style={{ width: "0%" }}
+                  style={{
+                    width: `${project.progressData?.progress || 0}%`,
+                  }}
                 ></div>
               </div>
 
               <div className="text-right text-xs text-gray-400 font-mono">
-                Asset progress will appear here
+                {project.progressData?.progress || 0}% complete
               </div>
             </div>
           </Link>
