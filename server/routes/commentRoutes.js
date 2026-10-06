@@ -8,10 +8,16 @@ const {
 } = require("../controllers/commentController");
 
 const { protect } = require("../middleware/authMiddleware");
+const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.post("/asset/:assetId", protect, createComment);
+router.post(
+  "/asset/:assetId",
+  protect,
+  authorize("admin", "manager", "client"),
+  createComment,
+);
 
 router.get("/asset/:assetId", protect, getAssetComments);
 

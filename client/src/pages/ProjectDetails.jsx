@@ -3,16 +3,35 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
 import CreateAssetModal from "../components/CreateAssetModal";
-import { getProjectById, updateProject } from "../services/projectService";
+import {
+  addProjectMember,
+  removeProjectMember,
+  getProjectById,
+  updateProject,
+} from "../services/projectService";
 import {
   getProjectAssets,
   getProjectProgress,
   approveVersion,
   rejectVersion,
 } from "../services/assetService";
+import { getUsers } from "../services/userService";
 const ProjectDetails = () => {
   const { id: projectId } = useParams();
   const { user } = useAuth();
+
+  //user management state
+  const [users, setUsers] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberRole, setSelectedMemberRole] = useState("artist");
+  const [memberLoading, setMemberLoading] = useState(false);
+
+  // Robust role checking
+  const isAdmin = user?.role === "admin";
+  const isManager = user?.role === "manager" || isAdmin;
+  const isArtist = user?.role === "artist";
+  const isClient = user?.role === "client";
+
   //project state
   const [project, setProject] = useState(null);
   const [assets, setAssets] = useState([]);
@@ -25,12 +44,6 @@ const ProjectDetails = () => {
   const [selectedVersionNumber, setSelectedVersionNumber] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Robust role checking
-  const isManager = user?.role === "manager" || user?.role === "admin";
-
-  const isClient = user?.role === "client";
-
-  const isArtist = user?.role === "artist";
 
   const [activeTab, setActiveTab] = useState("comments");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -42,6 +55,21 @@ const ProjectDetails = () => {
   const [newComment, setNewComment] = useState("");
   const commentsEndRef = useRef(null);
 
+  const handleOpenTeamModal = async () => {
+    setIsTeamModalOpen(true);
+
+    if (isManager) {
+      try {
+        const response = await getUsers();
+        setUsers(response.users || []);
+      } catch (error) {
+        showNotification(
+          error.response?.data?.message || "Failed to load users.",
+          "error",
+        );
+      }
+    }
+  };
   const loadProject = async () => {
     try {
       setLoading(true);
@@ -359,15 +387,16 @@ const ProjectDetails = () => {
             {selectedVersion?.status || "pending"}
           </span>
 
-          {isManager && (
-            <button
-              onClick={() => setIsTeamModalOpen(true)}
-              className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
-            >
-              <span>⚙</span> Manage Team
-            </button>
-          )}
-          {isManager && (
+          {isManager ||
+            (isAdmin && (
+              <button
+                onClick={() => setIsTeamModalOpen(true)}
+                className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
+              >
+                <span>⚙</span> Manage Team
+              </button>
+            ))}
+          {(isManager || isArtist) && (
             <button
               onClick={() => setIsCreateAssetModalOpen(true)}
               className="btn-primary py-1.5 px-4 text-sm"

@@ -7,7 +7,7 @@ const protect = async (req, res, next) => {
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
-        message: "Not authorized",
+        message: "Not authorized, no token provided",
       });
     }
 
@@ -15,7 +15,7 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.userId).select("-password");
 
     if (!user) {
       return res.status(401).json({
@@ -23,14 +23,24 @@ const protect = async (req, res, next) => {
       });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: "User account is inactive",
+      });
+    }
+
     req.user = user;
 
     next();
   } catch (error) {
+    console.error("Authentication error:", error);
+
     return res.status(401).json({
-      message: "Invalid or expired token",
+      message: "Not authorized, invalid or expired token",
     });
   }
 };
 
-module.exports = { protect };
+module.exports = {
+  protect,
+};

@@ -13,7 +13,7 @@ const {
 } = require("../controllers/assetController");
 
 const { protect } = require("../middleware/authMiddleware");
-const authorize = require("../middleware/roleMiddleware");
+const { authorize } = require("../middleware/roleMiddleware");
 const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
