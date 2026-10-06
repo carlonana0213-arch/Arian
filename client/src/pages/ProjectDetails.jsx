@@ -25,6 +25,7 @@ const ProjectDetails = () => {
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [selectedMemberRole, setSelectedMemberRole] = useState("artist");
   const [memberLoading, setMemberLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // Robust role checking
   const isAdmin = user?.role === "admin";
@@ -54,6 +55,23 @@ const ProjectDetails = () => {
 
   const [newComment, setNewComment] = useState("");
   const commentsEndRef = useRef(null);
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+
+      const data = await getUsers();
+
+      setUsers(data.users || []);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to load users.",
+        "error",
+      );
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   const handleOpenTeamModal = async () => {
     setIsTeamModalOpen(true);
@@ -146,22 +164,6 @@ const ProjectDetails = () => {
       (version) => version.versionNumber === selectedVersionNumber,
     ) || null;
 
-  const [teamMembers, setTeamMembers] = useState([
-    {
-      id: 1,
-      name: "France Sotelo",
-      role: "Lead Animator",
-      email: "france@studio.com",
-    },
-    {
-      id: 2,
-      name: "Jane Director",
-      role: "Project Manager",
-      email: "jane@studio.com",
-    },
-    { id: 3, name: "Oceania Rep", role: "Client", email: "review@oceania.com" },
-  ]);
-
   const [comments, setComments] = useState([
     {
       id: 1,
@@ -187,6 +189,7 @@ const ProjectDetails = () => {
       completed: true,
     },
   ]);
+
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("France");
 
@@ -413,7 +416,10 @@ const ProjectDetails = () => {
 
           {(isManager || isAdmin) && (
             <button
-              onClick={() => setIsTeamModalOpen(true)}
+              onClick={async () => {
+                setIsTeamModalOpen(true);
+                await loadUsers();
+              }}
               className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
             >
               <span>⚙</span> Manage Team
@@ -810,7 +816,11 @@ const ProjectDetails = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-colors duration-300 p-4">
           <div className="glass-panel w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
-              onClick={() => setIsTeamModalOpen(false)}
+              onClick={() => {
+                setIsTeamModalOpen(false);
+                setSelectedMemberId("");
+                setSelectedMemberRole("artist");
+              }}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
             >
               ✕
@@ -822,56 +832,99 @@ const ProjectDetails = () => {
               Add or remove members from this production.
             </p>
 
-            <form onSubmit={handleAddMember} className="flex gap-2 mb-6">
-              <input
-                type="email"
-                placeholder="Enter user email..."
-                value={newMemberEmail}
-                onChange={(e) => setNewMemberEmail(e.target.value)}
-                className="flex-1 bg-[#121212] border border-[#333333] text-white px-3 py-2 rounded focus:outline-none focus:border-[#9d4edd] text-sm"
-              />
-              <button
-                type="submit"
-                className="btn-primary py-2 px-4 text-sm shrink-0"
-              >
-                Invite
-              </button>
-            </form>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white">Current Team</h3>
 
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-              {teamMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex justify-between items-center bg-[#121212] p-3 rounded-lg border border-[#333333]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#1e1e1e] text-white flex items-center justify-center font-bold text-xs border border-[#333333]">
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
+              {project?.members?.length ? (
+                project.members.map((member) => (
+                  <div
+                    key={member.user?._id}
+                    className="flex items-center justify-between bg-[#121212] border border-[#333333] rounded-lg p-3"
+                  >
                     <div>
-                      <p className="text-sm font-semibold text-white">
-                        {member.name}
+                      <p className="text-sm font-medium text-white">
+                        {member.user?.firstName} {member.user?.lastName}
                       </p>
-                      <p className="text-xs text-gray-400">{member.role}</p>
+
+                      <p className="text-xs text-gray-500">
+                        {member.user?.email}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 capitalize">
+                        {member.role}
+                      </span>
+
+                      {member.user?._id !== project.manager?._id && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member.user._id)}
+                          disabled={memberLoading}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleRemoveMember(member.id)}
-                    className="text-xs text-[#ff477e] hover:underline font-medium"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No team members assigned.
+                </p>
+              )}
+              <div className="mt-6 pt-6 border-t border-[#333333]">
+                <h3 className="text-sm font-semibold text-white mb-4">
+                  Add Team Member
+                </h3>
 
-            <div className="mt-6 text-right">
-              <button
-                onClick={() => setIsTeamModalOpen(false)}
-                className="btn-secondary py-2 px-6 text-sm"
-              >
-                Done
-              </button>
+                {usersLoading ? (
+                  <p className="text-sm text-gray-500">Loading users...</p>
+                ) : (
+                  <div className="space-y-4">
+                    <select
+                      value={selectedMemberId}
+                      onChange={(e) => setSelectedMemberId(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
+                    >
+                      <option value="">Select user</option>
+
+                      {users
+                        .filter(
+                          (user) =>
+                            !project?.members?.some(
+                              (member) => member.user?._id === user._id,
+                            ),
+                        )
+                        .map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} — {user.role}
+                          </option>
+                        ))}
+                    </select>
+
+                    <select
+                      value={selectedMemberRole}
+                      onChange={(e) => setSelectedMemberRole(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
+                    >
+                      <option value="artist">Artist</option>
+                      <option value="manager">Manager</option>
+                      <option value="client">Client</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={handleAddMember}
+                      disabled={memberLoading || !selectedMemberId}
+                      className="btn-primary w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {memberLoading ? "Adding..." : "Add Member"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
