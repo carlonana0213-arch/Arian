@@ -29,7 +29,7 @@ import {
 
 import { getAssetComments, createComment } from "../services/commentService";
 const ProjectDetails = () => {
-  const { id: projectId } = useParams();
+  const { id: projectId, assetId } = useParams();
   const { user } = useAuth();
 
   //user management state
@@ -127,11 +127,15 @@ const ProjectDetails = () => {
       setAssets(loadedAssets);
 
       if (loadedAssets.length > 0) {
-        const firstAsset = loadedAssets[0];
+        const requestedAsset = assetId
+          ? loadedAssets.find((asset) => asset._id === assetId)
+          : null;
 
-        setSelectedAsset(firstAsset);
-        setSelectedAssetId(firstAsset._id);
-        setSelectedVersionNumber(firstAsset.currentVersion);
+        const assetToSelect = requestedAsset || loadedAssets[0];
+
+        setSelectedAsset(assetToSelect);
+        setSelectedAssetId(assetToSelect._id);
+        setSelectedVersionNumber(assetToSelect.currentVersion);
       } else {
         setSelectedAsset(null);
         setSelectedAssetId(null);
@@ -204,7 +208,7 @@ const ProjectDetails = () => {
 
   useEffect(() => {
     loadProject();
-  }, [projectId]);
+  }, [projectId, assetId]);
 
   const handleDeleteTask = async (taskId) => {
     try {
@@ -508,7 +512,7 @@ const ProjectDetails = () => {
       <header className="bg-[#1e1e1e] border-b border-[#333333] px-8 py-4 flex justify-between items-center z-10">
         <div className="flex items-center gap-4">
           <Link
-            to="/projects"
+            to={`/project/${projectId}`}
             className="text-gray-400 hover:text-[#9d4edd] text-sm font-medium transition-colors"
           >
             &larr; Back
@@ -653,29 +657,7 @@ const ProjectDetails = () => {
           )}
         </div>
       </header>
-      {!assetLoading && assets.length > 0 && (
-        <div className="w-full bg-[#1e1e1e] border-b border-[#333333] px-8 py-3">
-          <div className="max-w-5xl mx-auto flex items-center gap-3 overflow-x-auto">
-            {assets.map((asset) => (
-              <button
-                key={asset._id}
-                onClick={() => {
-                  setSelectedAsset(asset);
-                  setSelectedAssetId(asset._id);
-                  setSelectedVersionNumber(asset.currentVersion);
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  selectedAsset?._id === asset._id
-                    ? "bg-[#9d4edd] text-white"
-                    : "bg-[#121212] text-gray-400 border border-[#333333] hover:text-white"
-                }`}
-              >
-                {asset.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+
       <div className="flex-1 flex overflow-hidden">
         {/* Main Asset View */}
         {assetLoading ? (

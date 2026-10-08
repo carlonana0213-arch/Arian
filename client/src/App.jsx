@@ -16,7 +16,7 @@ import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Notifications from "./pages/Notifications";
-
+import ProjectAssets from "./pages/ProjectAssets";
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
 
@@ -48,6 +48,24 @@ function App() {
                 element={
                   <PrivateRoute>
                     <Projects />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/project/:id"
+                element={
+                  <PrivateRoute>
+                    <ProjectAssets />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/project/:id/asset/:assetId"
+                element={
+                  <PrivateRoute>
+                    <ProjectDetails />
                   </PrivateRoute>
                 }
               />
