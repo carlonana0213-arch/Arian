@@ -18,7 +18,7 @@ router.post("/", protect, authorize("admin", "manager", "artist"), createTask);
 router.get(
   "/asset/:assetId",
   protect,
-  authorize("admin", "manager", "artist"),
+  authorize("admin", "manager", "artist", "client"),
   getAssetTasks,
 );
 

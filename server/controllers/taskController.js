@@ -110,12 +110,6 @@ const getAssetTasks = async (req, res) => {
 
     if (!hasProjectAccess(project, req.user)) {
       return res.status(403).json({
-        message: "You do not have access to this task.",
-      });
-    }
-
-    if (!hasProjectAccess(project, req.user)) {
-      return res.status(403).json({
         message: "You do not have access to this project.",
       });
     }
