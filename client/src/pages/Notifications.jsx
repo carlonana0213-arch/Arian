@@ -1,9 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from "../services/notificationService";
 
 const Notifications = () => {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getNotifications();
+
+      setNotifications(data.notifications || []);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    }
+  }, [user]);
   const [activeTab, setActiveTab] = useState("all");
 
   const [notifications, setNotifications] = useState([]);
@@ -15,36 +41,77 @@ const Notifications = () => {
       ? notifications.filter((n) => !n.read)
       : notifications;
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          read: true,
+        })),
+      );
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    }
   };
 
-  const markAsRead = (id) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
+  const markAsRead = async (id) => {
+    try {
+      await markNotificationAsRead(id);
+
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification._id === id
+            ? { ...notification, read: true }
+            : notification,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
   };
 
   const getIcon = (type) => {
     switch (type) {
-      case "approval":
+      case "asset_approved":
         return (
           <div className="w-8 h-8 rounded-full bg-[#10b981]/20 text-[#10b981] flex items-center justify-center text-sm border border-[#10b981]/30">
             ✓
           </div>
         );
-      case "revision":
+
+      case "asset_rejected":
+      case "revision_requested":
         return (
           <div className="w-8 h-8 rounded-full bg-[#ff477e]/20 text-[#ff477e] flex items-center justify-center text-sm border border-[#ff477e]/30">
             ↻
           </div>
         );
-      case "mention":
+
+      case "feedback_posted":
+      case "feedback_updated":
+      case "feedback_deleted":
         return (
           <div className="w-8 h-8 rounded-full bg-[#9d4edd]/20 text-[#9d4edd] flex items-center justify-center text-sm border border-[#9d4edd]/30">
-            @
+            💬
           </div>
         );
+
+      case "task_completed":
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#10b981]/20 text-[#10b981] flex items-center justify-center text-sm border border-[#10b981]/30">
+            ✓
+          </div>
+        );
+
+      case "project_added":
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#9d4edd]/20 text-[#9d4edd] flex items-center justify-center text-sm border border-[#9d4edd]/30">
+            +
+          </div>
+        );
+
       default:
         return (
           <div className="w-8 h-8 rounded-full bg-[#ffd166]/20 text-[#ffd166] flex items-center justify-center text-sm border border-[#ffd166]/30">
@@ -104,7 +171,11 @@ const Notifications = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto bg-[#121212]">
-          {displayedNotifications.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-full p-8">
+              <p className="text-sm text-gray-500">Loading notifications...</p>
+            </div>
+          ) : displayedNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-16 h-16 rounded-full bg-[#1e1e1e] border border-[#333333] flex items-center justify-center text-3xl mb-4 opacity-50">
                 📭
@@ -121,7 +192,7 @@ const Notifications = () => {
             <div className="divide-y divide-[#333333]">
               {displayedNotifications.map((notif) => (
                 <div
-                  key={notif.id}
+                  key={notif._id}
                   className={`flex items-start gap-4 p-5 transition-colors group relative
                     ${notif.read ? "hover:bg-white/5" : "bg-white/5 hover:bg-white/10"}
                   `}
@@ -135,17 +206,17 @@ const Notifications = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline gap-2 mb-1">
                       <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                        {notif.project}
+                        {notif.project?.name || "Project"}
                       </p>
                       <span className="text-xs text-gray-400 whitespace-nowrap">
-                        {notif.time}
+                        {new Date(notif.createdAt).toLocaleString()}
                       </span>
                     </div>
 
                     <p
                       className={`text-sm mb-2 ${notif.read ? "text-gray-300" : "text-white font-medium"}`}
                     >
-                      {notif.text}
+                      {notif.message}
                     </p>
 
                     <div className="flex items-center gap-4">

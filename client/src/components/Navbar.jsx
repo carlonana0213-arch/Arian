@@ -1,12 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationAsRead,
+} from "../services/notificationService";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   const dropdownRef = useRef(null);
 
@@ -20,6 +28,30 @@ const Navbar = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setNotificationLoading(true);
+
+      const [notificationData, countData] = await Promise.all([
+        getNotifications(),
+        getUnreadNotificationCount(),
+      ]);
+
+      setNotifications(notificationData.notifications || []);
+      setUnreadCount(countData.count || 0);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -61,7 +93,9 @@ const Navbar = () => {
             className="text-gray-400 hover:text-[#ffd166] transition-colors relative"
           >
             🔔
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#ff477e] rounded-full"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#ff477e] rounded-full"></span>
+            )}
           </button>
 
           {isNotifOpen && (
@@ -73,20 +107,61 @@ const Navbar = () => {
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {/* FIXED: hover:bg-[#1e1e1e] -> hover:bg-white/5 */}
-                <div className="px-4 py-3 hover:bg-white/5 border-b border-[#333333] cursor-pointer transition-colors">
-                  <p className="text-sm text-white">
-                    <span className="text-[#10b981] font-bold">Approved:</span>{" "}
-                    Zhongli_Burst_v2
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">10 minutes ago</p>
-                </div>
-                {/* FIXED: hover:bg-[#1e1e1e] -> hover:bg-white/5 */}
-                <div className="px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors">
-                  <p className="text-sm text-white">
-                    <span className="text-[#ff477e] font-bold">Revision:</span>{" "}
-                    Walk Cycle Polish
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">1 hour ago</p>
+                <div className="max-h-64 overflow-y-auto">
+                  {notificationLoading ? (
+                    <div className="px-4 py-5 text-sm text-gray-500">
+                      Loading notifications...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="px-4 py-5 text-sm text-gray-500">
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    notifications.slice(0, 5).map((notification) => (
+                      <button
+                        key={notification._id}
+                        onClick={async () => {
+                          if (!notification.read) {
+                            try {
+                              await markNotificationAsRead(notification._id);
+
+                              setNotifications((current) =>
+                                current.map((item) =>
+                                  item._id === notification._id
+                                    ? { ...item, read: true }
+                                    : item,
+                                ),
+                              );
+
+                              setUnreadCount((count) => Math.max(0, count - 1));
+                            } catch (error) {
+                              console.error(
+                                "Failed to mark notification as read:",
+                                error,
+                              );
+                            }
+                          }
+
+                          setIsNotifOpen(false);
+
+                          if (notification.project?._id) {
+                            navigate(`/project/${notification.project._id}`);
+                          }
+                        }}
+                        className={`w-full text-left px-4 py-3 hover:bg-white/5 border-b border-[#333333] transition-colors ${
+                          !notification.read ? "bg-white/5" : ""
+                        }`}
+                      >
+                        <p className="text-sm text-white">
+                          {notification.message}
+                        </p>
+
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(notification.createdAt).toLocaleString()}
+                        </p>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 

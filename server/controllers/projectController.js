@@ -1,6 +1,8 @@
 const Project = require("../models/Project");
 const User = require("../models/User");
 const createAuditLog = require("../utils/createAuditLog");
+const createNotifications = require("../utils/createNotification");
+const getProjectRecipients = require("../utils/getProjectRecipients");
 //create
 const createProject = async (req, res) => {
   try {
@@ -69,20 +71,8 @@ const createProject = async (req, res) => {
       .populate("client", "firstName lastName email role")
       .populate("members.user", "firstName lastName email role");
 
-    const recipientIds = [];
-
-    if (project.client) {
-      recipientIds.push(project.client);
-    }
-
-    project.members.forEach((member) => {
-      if (member.user) {
-        recipientIds.push(member.user);
-      }
-    });
-
     await createNotifications({
-      recipientIds,
+      recipientIds: getProjectRecipients(project),
       projectId: project._id,
       actorId: req.user._id,
       type: "project_added",
@@ -227,6 +217,14 @@ const updateProject = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "project_updated",
+      message: `Project "${project.name}" was updated.`,
+    });
+
     const updatedProject = await Project.findById(project._id)
       .populate("manager", "firstName lastName email role")
       .populate("client", "firstName lastName email role")
@@ -269,6 +267,14 @@ const deleteProject = async (req, res) => {
       action: "PROJECT_DELETED",
       details: `Deleted project "${project.name}".`,
       req,
+    });
+
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "project_updated",
+      message: `Project "${project.name}" was deleted.`,
     });
 
     await project.deleteOne();
@@ -342,7 +348,6 @@ const addMember = async (req, res) => {
     });
 
     await project.save();
-    const createNotifications = require("../utils/createNotification");
     await createNotifications({
       recipientIds: [userId],
       projectId: project._id,
@@ -403,11 +408,36 @@ const removeMember = async (req, res) => {
       });
     }
 
+    const wasMember = project.members.some(
+      (member) => member.user.toString() === req.params.userId,
+    );
+
+    if (!wasMember) {
+      return res.status(404).json({
+        message: "User is not a member of this project.",
+      });
+    }
+
     project.members = project.members.filter(
       (member) => member.user.toString() !== req.params.userId,
     );
 
     await project.save();
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "MEMBER_REMOVED",
+      details: `Removed ${removedUser.firstName} ${removedUser.lastName} from project "${project.name}".`,
+      req,
+    });
+
+    await createNotifications({
+      recipientIds: [req.params.userId],
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "member_removed",
+      message: `You were removed from project "${project.name}".`,
+    });
 
     res.json({
       message: "Member removed successfully.",

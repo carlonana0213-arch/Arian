@@ -4,6 +4,8 @@ const User = require("../models/User");
 const Task = require("../models/Task");
 const cloudinary = require("../config/cloudinary");
 const createAuditLog = require("../utils/createAuditLog");
+const createNotifications = require("../utils/createNotification");
+const getProjectRecipients = require("../utils/getProjectRecipients");
 
 const userHasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -115,10 +117,7 @@ const createAsset = async (req, res) => {
       req,
     });
 
-    const recipientIds = getProjectRecipients(project);
-
     await createNotifications({
-      recipientIds,
       projectId: project._id,
       actorId: req.user._id,
       type: "asset_created",
@@ -271,6 +270,14 @@ const updateAsset = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "asset_updated",
+      message: `Asset "${asset.title}" was updated in project "${project.name}".`,
+    });
+
     res.json({
       message: "Asset updated successfully.",
       asset,
@@ -368,6 +375,14 @@ const uploadNewVersion = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "version_uploaded",
+      message: `A new version of "${asset.title}" was uploaded to project "${project.name}".`,
+    });
+
     const populatedAsset = await Asset.findById(asset._id)
       .populate("versions.uploadedBy", "firstName lastName email role")
       .populate("versions.reviewedBy", "firstName lastName email role");
@@ -462,6 +477,14 @@ const approveVersion = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "asset_approved",
+      message: `Version ${versionNumber} of "${asset.title}" was approved.`,
+    });
+
     res.json({
       message: `Version ${versionNumber} approved successfully.`,
       asset,
@@ -530,6 +553,14 @@ const rejectVersion = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "asset_rejected",
+      message: `Version ${versionNumber} of "${asset.title}" was rejected.`,
+    });
+
     res.json({
       message: `Version ${versionNumber} rejected.`,
       asset,
@@ -590,6 +621,14 @@ const deleteAsset = async (req, res) => {
       req,
     });
     await asset.deleteOne();
+
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "asset_deleted",
+      message: `Asset "${asset.title}" was deleted from project "${project.name}".`,
+    });
 
     res.json({
       message: "Asset and all of its versions were deleted.",

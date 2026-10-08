@@ -27,16 +27,23 @@ const notificationSchema = new mongoose.Schema(
       enum: [
         "project_added",
         "project_updated",
+        "project_deleted",
+
         "member_added",
         "member_removed",
+
         "asset_created",
         "asset_updated",
         "asset_deleted",
         "version_uploaded",
         "asset_approved",
         "asset_rejected",
+
         "revision_requested",
         "feedback_posted",
+        "feedback_updated",
+        "feedback_deleted",
+
         "task_created",
         "task_updated",
         "task_completed",

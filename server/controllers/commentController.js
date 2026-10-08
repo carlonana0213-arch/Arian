@@ -2,6 +2,8 @@ const Comment = require("../models/Comment");
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
 const createAuditLog = require("../utils/createAuditLog");
+const createNotifications = require("../utils/createNotification");
+const getProjectRecipients = require("../utils/getProjectRecipients");
 
 const userHasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -115,6 +117,18 @@ const createComment = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type:
+        type === "revision_request" ? "revision_requested" : "feedback_posted",
+      message:
+        type === "revision_request"
+          ? `A revision was requested for "${asset.title}".`
+          : `New feedback was posted on "${asset.title}".`,
+    });
+
     res.status(201).json({
       message:
         type === "revision_request"
@@ -189,7 +203,18 @@ const updateComment = async (req, res) => {
       });
     }
 
-    const comment = await Comment.findById(req.params.id);
+    const comment = await Comment.findById(req.params.id).populate(
+      "asset",
+      "title project",
+    );
+
+    const project = await Project.findById(comment.asset.project);
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found.",
+      });
+    }
 
     if (!comment) {
       return res.status(404).json({
@@ -214,6 +239,14 @@ const updateComment = async (req, res) => {
       action: "FEEDBACK_UPDATED",
       details: "Updated feedback/comment.",
       req,
+    });
+
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "feedback_posted",
+      message: `Feedback on "${comment.asset.title}" was updated.`,
     });
 
     const updatedComment = await Comment.findById(comment._id).populate(

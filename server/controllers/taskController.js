@@ -2,6 +2,8 @@ const Task = require("../models/Task");
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
 const createAuditLog = require("../utils/createAuditLog");
+const createNotifications = require("../utils/createNotification");
+const getProjectRecipients = require("../utils/getProjectRecipients");
 
 const hasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -83,6 +85,14 @@ const createTask = async (req, res) => {
       req,
     });
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "task_created",
+      message: `A new task "${task.title}" was created for "${asset.title}".`,
+    });
+
     res.status(201).json({
       message: "Task created successfully",
       task: populatedTask,
@@ -148,6 +158,8 @@ const updateTask = async (req, res) => {
 
     const task = await Task.findById(id);
 
+    const project = await Project.findById(task.project);
+
     if (!task) {
       return res.status(404).json({
         message: "Task not found",
@@ -174,6 +186,27 @@ const updateTask = async (req, res) => {
     if (typeof completed === "boolean") {
       task.completed = completed;
       task.completedAt = completed ? new Date() : null;
+    }
+
+    if (typeof completed === "boolean") {
+      await createAuditLog({
+        userId: req.user._id,
+        action: completed ? "TASK_COMPLETED" : "TASK_REOPENED",
+        details: completed
+          ? `Completed task "${task.title}".`
+          : `Reopened task "${task.title}".`,
+        req,
+      });
+
+      await createNotifications({
+        recipientIds: getProjectRecipients(project),
+        projectId: project._id,
+        actorId: req.user._id,
+        type: completed ? "task_completed" : "task_reopened",
+        message: completed
+          ? `Task "${task.title}" was completed.`
+          : `Task "${task.title}" was reopened.`,
+      });
     }
 
     if (isManager) {
@@ -214,6 +247,14 @@ const updateTask = async (req, res) => {
       });
     }
 
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "task_updated",
+      message: `Task "${task.title}" was updated.`,
+    });
+
     const populatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role");
@@ -236,6 +277,14 @@ const deleteTask = async (req, res) => {
 
     const task = await Task.findById(id);
 
+    const project = await Project.findById(task.project);
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
     if (!task) {
       return res.status(404).json({
         message: "Task not found",
@@ -253,6 +302,14 @@ const deleteTask = async (req, res) => {
       action: "TASK_DELETED",
       details: `Deleted task "${task.title}".`,
       req,
+    });
+
+    await createNotifications({
+      recipientIds: getProjectRecipients(project),
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "task_deleted",
+      message: `Task "${task.title}" was deleted.`,
     });
 
     await task.deleteOne();
