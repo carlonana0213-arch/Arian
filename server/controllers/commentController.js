@@ -1,6 +1,7 @@
 const Comment = require("../models/Comment");
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
+const createAuditLog = require("../utils/createAuditLog");
 
 const userHasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -103,6 +104,17 @@ const createComment = async (req, res) => {
       "firstName lastName email role",
     );
 
+    await createAuditLog({
+      userId: req.user._id,
+      action:
+        type === "revision_request" ? "REVISION_REQUESTED" : "FEEDBACK_POSTED",
+      details:
+        type === "revision_request"
+          ? `Requested a revision for asset "${asset.title}".`
+          : `Posted feedback on asset "${asset.title}".`,
+      req,
+    });
+
     res.status(201).json({
       message:
         type === "revision_request"
@@ -197,6 +209,13 @@ const updateComment = async (req, res) => {
 
     await comment.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "FEEDBACK_UPDATED",
+      details: "Updated feedback/comment.",
+      req,
+    });
+
     const updatedComment = await Comment.findById(comment._id).populate(
       "user",
       "firstName lastName email role",
@@ -220,7 +239,10 @@ const updateComment = async (req, res) => {
 // ========================================
 const deleteComment = async (req, res) => {
   try {
-    const comment = await Comment.findById(req.params.id);
+    const comment = await Comment.findById(req.params.id).populate(
+      "asset",
+      "title",
+    );
 
     if (!comment) {
       return res.status(404).json({
@@ -235,6 +257,13 @@ const deleteComment = async (req, res) => {
         message: "You can only delete your own comments.",
       });
     }
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "FEEDBACK_DELETED",
+      details: `Deleted feedback from asset "${comment.asset?.title || "Unknown asset"}".`,
+      req,
+    });
 
     await comment.deleteOne();
 

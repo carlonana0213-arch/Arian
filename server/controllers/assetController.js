@@ -3,6 +3,7 @@ const Project = require("../models/Project");
 const User = require("../models/User");
 const Task = require("../models/Task");
 const cloudinary = require("../config/cloudinary");
+const createAuditLog = require("../utils/createAuditLog");
 
 const userHasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -106,6 +107,13 @@ const createAsset = async (req, res) => {
     const populatedAsset = await Asset.findById(asset._id)
       .populate("versions.uploadedBy", "firstName lastName email role")
       .populate("versions.reviewedBy", "firstName lastName email role");
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "ASSET_CREATED",
+      details: `Created asset "${asset.title}" in project "${project.name}".`,
+      req,
+    });
 
     res.status(201).json({
       message: "Asset created successfully.",
@@ -246,6 +254,13 @@ const updateAsset = async (req, res) => {
 
     await asset.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "ASSET_UPDATED",
+      details: `Updated asset "${asset.title}".`,
+      req,
+    });
+
     res.json({
       message: "Asset updated successfully.",
       asset,
@@ -336,6 +351,13 @@ const uploadNewVersion = async (req, res) => {
 
     await asset.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "VERSION_UPLOADED",
+      details: `Uploaded version ${nextVersion} of asset "${asset.title}".`,
+      req,
+    });
+
     const populatedAsset = await Asset.findById(asset._id)
       .populate("versions.uploadedBy", "firstName lastName email role")
       .populate("versions.reviewedBy", "firstName lastName email role");
@@ -423,6 +445,13 @@ const approveVersion = async (req, res) => {
 
     await asset.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "ASSET_APPROVED",
+      details: `Approved version ${versionNumber} of asset "${asset.title}".`,
+      req,
+    });
+
     res.json({
       message: `Version ${versionNumber} approved successfully.`,
       asset,
@@ -484,6 +513,13 @@ const rejectVersion = async (req, res) => {
 
     await asset.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "ASSET_REJECTED",
+      details: `Rejected version ${versionNumber} of asset "${asset.title}".`,
+      req,
+    });
+
     res.json({
       message: `Version ${versionNumber} rejected.`,
       asset,
@@ -537,6 +573,12 @@ const deleteAsset = async (req, res) => {
       }
     }
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "ASSET_DELETED",
+      details: `Deleted asset "${asset.title}".`,
+      req,
+    });
     await asset.deleteOne();
 
     res.json({

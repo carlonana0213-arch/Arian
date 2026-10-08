@@ -1,6 +1,6 @@
 const Project = require("../models/Project");
 const User = require("../models/User");
-
+const createAuditLog = require("../utils/createAuditLog");
 //create
 const createProject = async (req, res) => {
   try {
@@ -68,6 +68,13 @@ const createProject = async (req, res) => {
       .populate("manager", "firstName lastName email role")
       .populate("client", "firstName lastName email role")
       .populate("members.user", "firstName lastName email role");
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "PROJECT_CREATED",
+      details: `Created project "${project.name}".`,
+      req,
+    });
 
     res.status(201).json({
       message: "Project created successfully.",
@@ -193,6 +200,13 @@ const updateProject = async (req, res) => {
 
     await project.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "PROJECT_UPDATED",
+      details: `Updated project "${project.name}".`,
+      req,
+    });
+
     const updatedProject = await Project.findById(project._id)
       .populate("manager", "firstName lastName email role")
       .populate("client", "firstName lastName email role")
@@ -229,6 +243,13 @@ const deleteProject = async (req, res) => {
         message: "Only the project manager can delete this project.",
       });
     }
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "PROJECT_DELETED",
+      details: `Deleted project "${project.name}".`,
+      req,
+    });
 
     await project.deleteOne();
 
@@ -302,6 +323,13 @@ const addMember = async (req, res) => {
 
     await project.save();
 
+    await createAuditLog({
+      userId: req.user._id,
+      action: "MEMBER_ADDED",
+      details: `Added ${user.firstName} ${user.lastName} to project "${project.name}" as ${role}.`,
+      req,
+    });
+
     const updatedProject = await Project.findById(project._id)
       .populate("manager", "firstName lastName email role")
       .populate("client", "firstName lastName email role")
@@ -336,6 +364,14 @@ const removeMember = async (req, res) => {
     if (req.user.role !== "admin" && !isManager) {
       return res.status(403).json({
         message: "Only the project manager can remove members.",
+      });
+    }
+
+    const removedUser = await User.findById(req.params.userId);
+
+    if (!removedUser) {
+      return res.status(404).json({
+        message: "User not found.",
       });
     }
 

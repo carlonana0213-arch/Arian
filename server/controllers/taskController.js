@@ -1,6 +1,7 @@
 const Task = require("../models/Task");
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
+const createAuditLog = require("../utils/createAuditLog");
 
 const hasProjectAccess = (project, user) => {
   if (user.role === "admin") {
@@ -74,6 +75,13 @@ const createTask = async (req, res) => {
     const populatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role");
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "TASK_CREATED",
+      details: `Created task "${task.title}" for asset "${asset.title}".`,
+      req,
+    });
 
     res.status(201).json({
       message: "Task created successfully",
@@ -184,6 +192,28 @@ const updateTask = async (req, res) => {
 
     await task.save();
 
+    if (typeof completed === "boolean") {
+      await createAuditLog({
+        userId: req.user._id,
+        action: completed ? "TASK_COMPLETED" : "TASK_REOPENED",
+        details: completed
+          ? `Completed task "${task.title}".`
+          : `Reopened task "${task.title}".`,
+        req,
+      });
+    } else if (
+      title !== undefined ||
+      description !== undefined ||
+      assignedTo !== undefined
+    ) {
+      await createAuditLog({
+        userId: req.user._id,
+        action: "TASK_UPDATED",
+        details: `Updated task "${task.title}".`,
+        req,
+      });
+    }
+
     const populatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role");
@@ -217,6 +247,13 @@ const deleteTask = async (req, res) => {
         message: "You do not have permission to delete tasks",
       });
     }
+
+    await createAuditLog({
+      userId: req.user._id,
+      action: "TASK_DELETED",
+      details: `Deleted task "${task.title}".`,
+      req,
+    });
 
     await task.deleteOne();
 

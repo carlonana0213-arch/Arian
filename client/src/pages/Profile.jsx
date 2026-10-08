@@ -34,6 +34,13 @@ const Profile = () => {
 
   const getActivityPresentation = (log) => {
     switch (log.action) {
+      case "ACCOUNT_CREATED":
+        return {
+          icon: "✨",
+          title: "Created Arian account",
+          subtitle: log.details,
+        };
+
       case "LOGIN_SUCCESS":
         return {
           icon: "🔐",
@@ -55,10 +62,143 @@ const Profile = () => {
           subtitle: log.details,
         };
 
-      case "ACCOUNT_CREATED":
+      case "PROJECT_CREATED":
         return {
-          icon: "✨",
-          title: "Created Arian account",
+          icon: "📁",
+          title: "Created a new project",
+          subtitle: log.details,
+        };
+
+      case "PROJECT_UPDATED":
+        return {
+          icon: "✏️",
+          title: "Updated a project",
+          subtitle: log.details,
+        };
+
+      case "PROJECT_DELETED":
+        return {
+          icon: "🗑️",
+          title: "Deleted a project",
+          subtitle: log.details,
+        };
+
+      case "MEMBER_ADDED":
+        return {
+          icon: "👥",
+          title: "Added a project member",
+          subtitle: log.details,
+        };
+
+      case "MEMBER_REMOVED":
+        return {
+          icon: "👤",
+          title: "Removed a project member",
+          subtitle: log.details,
+        };
+
+      case "ASSET_CREATED":
+        return {
+          icon: "🎨",
+          title: "Created a new asset",
+          subtitle: log.details,
+        };
+
+      case "ASSET_UPDATED":
+        return {
+          icon: "✏️",
+          title: "Updated an asset",
+          subtitle: log.details,
+        };
+
+      case "ASSET_DELETED":
+        return {
+          icon: "🗑️",
+          title: "Deleted an asset",
+          subtitle: log.details,
+        };
+
+      case "VERSION_UPLOADED":
+        return {
+          icon: "⬆️",
+          title: "Uploaded a new asset version",
+          subtitle: log.details,
+        };
+
+      case "ASSET_APPROVED":
+        return {
+          icon: "✅",
+          title: "Approved an asset",
+          subtitle: log.details,
+        };
+
+      case "ASSET_REJECTED":
+        return {
+          icon: "❌",
+          title: "Rejected an asset",
+          subtitle: log.details,
+        };
+
+      case "REVISION_REQUESTED":
+        return {
+          icon: "↻",
+          title: "Requested a revision",
+          subtitle: log.details,
+        };
+
+      case "FEEDBACK_POSTED":
+        return {
+          icon: "💬",
+          title: "Posted feedback",
+          subtitle: log.details,
+        };
+
+      case "FEEDBACK_UPDATED":
+        return {
+          icon: "📝",
+          title: "Updated feedback",
+          subtitle: log.details,
+        };
+
+      case "FEEDBACK_DELETED":
+        return {
+          icon: "🗑️",
+          title: "Deleted feedback",
+          subtitle: log.details,
+        };
+
+      case "TASK_CREATED":
+        return {
+          icon: "📋",
+          title: "Created a task",
+          subtitle: log.details,
+        };
+
+      case "TASK_COMPLETED":
+        return {
+          icon: "☑️",
+          title: "Completed a task",
+          subtitle: log.details,
+        };
+
+      case "TASK_REOPENED":
+        return {
+          icon: "↩️",
+          title: "Reopened a task",
+          subtitle: log.details,
+        };
+
+      case "TASK_UPDATED":
+        return {
+          icon: "✏️",
+          title: "Updated a task",
+          subtitle: log.details,
+        };
+
+      case "TASK_DELETED":
+        return {
+          icon: "🗑️",
+          title: "Deleted a task",
           subtitle: log.details,
         };
 
