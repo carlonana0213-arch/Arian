@@ -800,7 +800,11 @@ const ProjectDetails = () => {
           {activeTab === "tasks" && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                {tasks.length === 0 ? (
+                {tasksLoading ? (
+                  <p className="text-sm text-gray-500 text-center mt-4">
+                    Loading tasks...
+                  </p>
+                ) : tasks.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center mt-4">
                     No tasks assigned for this asset yet.
                   </p>
@@ -817,12 +821,18 @@ const ProjectDetails = () => {
                         disabled={!isManager && !isArtist}
                         className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer"
                       />
+
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`text-sm ${task.completed ? "text-gray-500 line-through" : "text-white"}`}
+                          className={`text-sm ${
+                            task.completed
+                              ? "text-gray-500 line-through"
+                              : "text-white"
+                          }`}
                         >
                           {task.title}
                         </p>
+
                         <span className="inline-block mt-2 px-2 py-0.5 bg-[#1e1e1e] text-gray-400 text-[10px] rounded border border-[#333333] uppercase font-bold tracking-wider">
                           @
                           {task.assignedTo

@@ -3,11 +3,11 @@ import api from "./api";
 export const getTasksByAssetId = async (assetId) => {
   const response = await api.get(`/tasks/asset/${assetId}`);
 
-  return response.data.tasks;
+  return response.data;
 };
 
 export const createTask = async (assetId, taskData) => {
-  const response = await api.post(`/tasks`, {
+  const response = await api.post("/tasks", {
     assetId,
     ...taskData,
   });
