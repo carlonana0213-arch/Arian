@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getProjectById } from "../services/projectService";
 import { getProjectAssets, deleteAsset } from "../services/assetService";
 import CreateAssetModal from "../components/CreateAssetModal";
+import { getUsers } from "../services/userService";
+import {
+  addProjectMember,
+  removeProjectMember,
+  getProjectById,
+  updateProject,
+} from "../services/projectService";
+
 import api from "../services/api";
 
 const ProjectAssets = () => {
@@ -23,6 +30,81 @@ const ProjectAssets = () => {
   const isArtist = user?.role === "artist";
 
   const canManageAssets = isManager || isArtist;
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [memberLoading, setMemberLoading] = useState(false);
+
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberRole, setSelectedMemberRole] = useState("artist");
+  const [toast, setToast] = useState(null);
+
+  const showNotification = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+
+      const data = await getUsers();
+
+      setUsers(data.users || []);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to load users.",
+        "error",
+      );
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedMemberId) {
+      showNotification("Please select a user.", "warning");
+      return;
+    }
+
+    try {
+      setMemberLoading(true);
+
+      await addProjectMember(projectId, selectedMemberId, selectedMemberRole);
+
+      await loadPage();
+
+      setSelectedMemberId("");
+
+      showNotification("Team member added successfully.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to add team member.",
+        "error",
+      );
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    try {
+      setMemberLoading(true);
+
+      await removeProjectMember(projectId, userId);
+
+      await loadPage();
+
+      showNotification("Team member removed.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to remove team member.",
+        "error",
+      );
+    } finally {
+      setMemberLoading(false);
+    }
+  };
 
   const loadPage = async () => {
     try {
@@ -144,6 +226,28 @@ const ProjectAssets = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
+      {toast && (
+        <div
+          className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 text-sm font-bold animate-in slide-in-from-top-4
+        ${
+          toast.type === "success"
+            ? "bg-[#10b981]/90 border border-[#10b981] text-white"
+            : toast.type === "warning"
+              ? "bg-[#ffd166]/90 border border-[#ffd166] text-[#121212]"
+              : "bg-[#ff477e]/90 border border-[#ff477e] text-white"
+        }`}
+        >
+          <span>
+            {toast.type === "success"
+              ? "✓"
+              : toast.type === "warning"
+                ? "↻"
+                : "✕"}
+          </span>
+
+          {toast.message}
+        </div>
+      )}
       <header className="flex justify-between items-start mb-8 pb-6 border-b border-[#333333]">
         <div>
           <Link
@@ -161,15 +265,27 @@ const ProjectAssets = () => {
             Manage and review project assets.
           </p>
         </div>
-
-        {canManageAssets && (
-          <button
-            onClick={() => setIsCreateAssetModalOpen(true)}
-            className="btn-primary py-2 px-6"
-          >
-            + Add Asset
-          </button>
-        )}
+        <div className="flex gap-3 items-center">
+          {(isManager || isAdmin) && (
+            <button
+              onClick={async () => {
+                setIsTeamModalOpen(true);
+                await loadUsers();
+              }}
+              className="btn-secondary py-2 px-6 "
+            >
+              <span>⚙</span> Manage Team
+            </button>
+          )}
+          {canManageAssets && (
+            <button
+              onClick={() => setIsCreateAssetModalOpen(true)}
+              className="btn-primary py-2 px-6"
+            >
+              + Add Asset
+            </button>
+          )}
+        </div>
       </header>
 
       {assets.length === 0 ? (
@@ -297,7 +413,119 @@ const ProjectAssets = () => {
           })}
         </div>
       )}
+      {isTeamModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-colors duration-300 p-4">
+          <div className="glass-panel w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setIsTeamModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+            <h2 className="text-2xl font-bold mb-1 text-white">
+              Manage Project Team
+            </h2>
+            <p className="text-gray-400 text-sm mb-6">
+              Add or remove members from this production.
+            </p>
 
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white">Current Team</h3>
+
+              {project?.members?.length ? (
+                project.members.map((member) => (
+                  <div
+                    key={member.user?._id}
+                    className="flex items-center justify-between bg-[#121212] border border-[#333333] rounded-lg p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {member.user?.firstName} {member.user?.lastName}
+                      </p>
+
+                      <p className="text-xs text-gray-500">
+                        {member.user?.email}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 capitalize">
+                        {member.role}
+                      </span>
+
+                      {member.user?._id !== project.manager?._id && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member.user._id)}
+                          disabled={memberLoading}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No team members assigned.
+                </p>
+              )}
+              <div className="mt-6 pt-6 border-t border-[#333333]">
+                <h3 className="text-sm font-semibold text-white mb-4">
+                  Add Team Member
+                </h3>
+
+                {usersLoading ? (
+                  <p className="text-sm text-gray-500">Loading users...</p>
+                ) : (
+                  <div className="space-y-4">
+                    <select
+                      value={selectedMemberId}
+                      onChange={(e) => setSelectedMemberId(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
+                    >
+                      <option value="">Select user</option>
+
+                      {users
+                        .filter(
+                          (user) =>
+                            !project?.members?.some(
+                              (member) => member.user?._id === user._id,
+                            ),
+                        )
+                        .map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} — {user.role}
+                          </option>
+                        ))}
+                    </select>
+
+                    <select
+                      value={selectedMemberRole}
+                      onChange={(e) => setSelectedMemberRole(e.target.value)}
+                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
+                    >
+                      <option value="artist">Artist</option>
+                      <option value="manager">Manager</option>
+                      <option value="client">Client</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={handleAddMember}
+                      disabled={memberLoading || !selectedMemberId}
+                      className="btn-primary w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {memberLoading ? "Adding..." : "Add Member"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <CreateAssetModal
         isOpen={isCreateAssetModalOpen}
         onClose={() => setIsCreateAssetModalOpen(false)}
