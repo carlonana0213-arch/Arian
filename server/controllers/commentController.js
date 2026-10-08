@@ -25,11 +25,17 @@ const userHasProjectAccess = (project, user) => {
 // ========================================
 const createComment = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, type = "comment" } = req.body;
 
     if (!text || !text.trim()) {
       return res.status(400).json({
         message: "Comment text is required.",
+      });
+    }
+
+    if (!["comment", "revision_request"].includes(type)) {
+      return res.status(400).json({
+        message: "Invalid comment type.",
       });
     }
 
@@ -55,10 +61,41 @@ const createComment = async (req, res) => {
       });
     }
 
+    // Only managers can submit revision requests.
+    if (type === "revision_request") {
+      const isProjectManager =
+        req.user.role === "admin" ||
+        (project.manager &&
+          project.manager.toString() === req.user._id.toString());
+
+      const isManager = req.user.role === "manager";
+
+      if (!isProjectManager && !isManager) {
+        return res.status(403).json({
+          message: "Only managers can request revisions.",
+        });
+      }
+    }
+
+    // Normal feedback is limited to managers and clients.
+    if (type === "comment") {
+      const canComment =
+        req.user.role === "manager" ||
+        req.user.role === "client" ||
+        req.user.role === "admin";
+
+      if (!canComment) {
+        return res.status(403).json({
+          message: "Only managers and clients can add feedback.",
+        });
+      }
+    }
+
     const comment = await Comment.create({
       asset: asset._id,
       user: req.user._id,
       text: text.trim(),
+      type,
     });
 
     const populatedComment = await Comment.findById(comment._id).populate(
@@ -67,7 +104,10 @@ const createComment = async (req, res) => {
     );
 
     res.status(201).json({
-      message: "Comment added successfully.",
+      message:
+        type === "revision_request"
+          ? "Revision request submitted successfully."
+          : "Comment added successfully.",
       comment: populatedComment,
     });
   } catch (error) {

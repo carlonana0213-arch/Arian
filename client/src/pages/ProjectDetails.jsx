@@ -4,12 +4,15 @@ import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
 import CreateAssetModal from "../components/CreateAssetModal";
 
+import { getUsers } from "../services/userService";
+
 import {
   getTasksByAssetId,
   createTask,
   updateTask,
   deleteTask,
 } from "../services/taskService";
+
 import {
   addProjectMember,
   removeProjectMember,
@@ -23,7 +26,8 @@ import {
   approveVersion,
   rejectVersion,
 } from "../services/assetService";
-import { getUsers } from "../services/userService";
+
+import { getAssetComments, createComment } from "../services/commentService";
 const ProjectDetails = () => {
   const { id: projectId } = useParams();
   const { user } = useAuth();
@@ -171,8 +175,31 @@ const ProjectDetails = () => {
     }
   };
 
+  const loadComments = async (assetId) => {
+    if (!assetId) {
+      setComments([]);
+      return;
+    }
+
+    try {
+      setCommentsLoading(true);
+
+      const data = await getAssetComments(assetId);
+
+      setComments(data.comments || []);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to load feedback.",
+        "error",
+      );
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadTasks(selectedAssetId);
+    loadComments(selectedAssetId);
   }, [selectedAssetId]);
 
   useEffect(() => {
@@ -222,15 +249,13 @@ const ProjectDetails = () => {
 
   const canReviewAsset =
     isManager && selectedVersion?.status === "pending" && allTasksCompleted;
-  const [comments, setComments] = useState([
-    {
-      id: 1,
-      author: "Jane Director",
-      initials: "JD",
-      text: "The lighting in the background looks great, but can we fix the timing on the walk cycle?",
-      time: "10 mins ago",
-    },
-  ]);
+
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  const [revisionModalOpen, setRevisionModalOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState("");
+  const [revisionSubmitting, setRevisionSubmitting] = useState(false);
 
   const showNotification = (message, type = "success") => {
     setToast({ message, type });
@@ -255,10 +280,63 @@ const ProjectDetails = () => {
   };
 
   const handleRequestRevision = () => {
-    showNotification(
-      "Revision requests will be connected to the asset review workflow.",
-      "warning",
-    );
+    if (!selectedAssetId) {
+      showNotification("Please select an asset first.", "warning");
+      return;
+    }
+
+    if (!isManager) {
+      showNotification("Only managers can request revisions.", "error");
+      return;
+    }
+
+    setRevisionText("");
+    setRevisionModalOpen(true);
+  };
+
+  const handleSubmitRevisionRequest = async (e) => {
+    e.preventDefault();
+
+    if (!revisionText.trim()) {
+      showNotification("Please enter a revision request.", "warning");
+      return;
+    }
+
+    if (!selectedAssetId) {
+      return;
+    }
+
+    try {
+      setRevisionSubmitting(true);
+
+      const data = await createComment(
+        selectedAssetId,
+        revisionText.trim(),
+        "revision_request",
+      );
+
+      setComments((prev) => [...prev, data.comment]);
+
+      setRevisionText("");
+      setRevisionModalOpen(false);
+
+      setActiveTab("comments");
+
+      setTimeout(() => {
+        commentsEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+        });
+      }, 100);
+
+      showNotification("Revision request submitted successfully.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to submit revision request.",
+        "error",
+      );
+    } finally {
+      setRevisionSubmitting(false);
+    }
   };
 
   const handleReject = async () => {
@@ -268,24 +346,45 @@ const ProjectDetails = () => {
     );
   };
 
-  const handlePostComment = (e) => {
+  const handlePostComment = async (e) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
-    setComments([
-      ...comments,
-      {
-        id: Date.now(),
-        author: user?.name || "Me",
-        initials: (user?.name || "M").charAt(0).toUpperCase(),
-        text: newComment,
-        time: "Just now",
-      },
-    ]);
-    setNewComment("");
-    setTimeout(
-      () => commentsEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100,
-    );
+
+    if (!newComment.trim()) {
+      return;
+    }
+
+    if (!selectedAssetId) {
+      showNotification("Please select an asset first.", "warning");
+      return;
+    }
+
+    if (!isManager && !isClient) {
+      showNotification("Only managers and clients can add feedback.", "error");
+      return;
+    }
+
+    try {
+      const data = await createComment(
+        selectedAssetId,
+        newComment.trim(),
+        "comment",
+      );
+
+      setComments((prev) => [...prev, data.comment]);
+
+      setNewComment("");
+
+      setTimeout(() => {
+        commentsEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+        });
+      }, 100);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to post feedback.",
+        "error",
+      );
+    }
   };
 
   const handleAddMember = async () => {
@@ -737,75 +836,129 @@ const ProjectDetails = () => {
 
           {activeTab === "comments" && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {comments.map((comment) =>
-                  comment.isSystem ? (
-                    <div
-                      key={comment.id}
-                      className={`border rounded-lg p-3 flex gap-3 
-                      ${
-                        comment.type === "success"
-                          ? "bg-[#10b981]/10 border-[#10b981]/30 text-[#10b981]"
-                          : comment.type === "warning"
-                            ? "bg-[#ffd166]/10 border-[#ffd166]/30 text-[#ffd166]"
-                            : "bg-[#ff477e]/10 border-[#ff477e]/30 text-[#ff477e]"
-                      }`}
-                    >
-                      <span>
-                        {comment.type === "success"
-                          ? "✓"
-                          : comment.type === "warning"
-                            ? "↻"
-                            : "✕"}
-                      </span>
-                      <p className="text-sm text-white">{comment.text}</p>
-                    </div>
-                  ) : (
-                    <div key={comment.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9d4edd] to-[#ff477e] flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
-                        {comment.initials}
-                      </div>
-                      <div>
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-sm text-white">
-                            {comment.author}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {comment.time}
-                          </span>
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {commentsLoading ? (
+                  <p className="text-sm text-gray-500 text-center mt-4">
+                    Loading feedback...
+                  </p>
+                ) : comments.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center mt-4">
+                    No feedback yet.
+                  </p>
+                ) : (
+                  comments.map((comment) => {
+                    const isRevisionRequest =
+                      comment.type === "revision_request";
+
+                    const firstName = comment.user?.firstName || "";
+                    const lastName = comment.user?.lastName || "";
+
+                    const fullName =
+                      `${firstName} ${lastName}`.trim() || "Unknown User";
+
+                    const initials =
+                      `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+                      "U";
+
+                    const formattedTime = comment.createdAt
+                      ? new Date(comment.createdAt).toLocaleString()
+                      : "";
+
+                    return isRevisionRequest ? (
+                      <div
+                        key={comment._id}
+                        className="border border-[#ffd166]/50 bg-[#ffd166]/10 rounded-lg p-4 shadow-md"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[#ffd166] text-[#121212] flex items-center justify-center text-xs font-bold shrink-0">
+                            ↻
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-[#ffd166]">
+                                  Revision Request
+                                </p>
+
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {fullName}
+                                </p>
+                              </div>
+
+                              <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                {formattedTime}
+                              </span>
+                            </div>
+
+                            <p className="text-sm text-white leading-relaxed bg-[#121212]/70 border border-[#ffd166]/20 rounded-md p-3">
+                              {comment.text}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-white leading-relaxed bg-[#121212] p-3 rounded-r-lg rounded-bl-lg border border-[#333333]">
-                          {comment.text}
-                        </p>
                       </div>
-                    </div>
-                  ),
+                    ) : (
+                      <div key={comment._id} className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9d4edd] to-[#ff477e] flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
+                          {initials}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <span className="font-semibold text-sm text-white">
+                              {fullName}
+                            </span>
+
+                            <span className="text-xs text-gray-400">
+                              {formattedTime}
+                            </span>
+                          </div>
+
+                          <p className="text-sm text-white leading-relaxed bg-[#121212] p-3 rounded-r-lg rounded-bl-lg border border-[#333333]">
+                            {comment.text}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
+
                 <div ref={commentsEndRef} />
               </div>
 
-              <form
-                onSubmit={handlePostComment}
-                className="p-4 border-t border-[#333333] bg-[#121212]"
-              >
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Leave frame-accurate feedback..."
-                  className="w-full bg-[#1e1e1e] text-white border border-[#333333] rounded-md p-3 text-sm resize-none focus:outline-none focus:border-[#ff477e] h-24 transition-colors"
-                ></textarea>
-                <div className="flex justify-between items-center mt-3">
-                  <span className="text-xs text-gray-400">
-                    Use @ to tag team members
-                  </span>
-                  <button
-                    type="submit"
-                    className="btn-primary py-1.5 px-4 text-sm"
-                  >
-                    Post
-                  </button>
+              {isManager || isClient ? (
+                <form
+                  onSubmit={handlePostComment}
+                  className="p-4 border-t border-[#333333] bg-[#121212]"
+                >
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Leave feedback..."
+                    className="w-full bg-[#1e1e1e] text-white border border-[#333333] rounded-md p-3 text-sm resize-none focus:outline-none focus:border-[#ff477e] h-24 transition-colors"
+                  />
+
+                  <div className="flex justify-between items-center mt-3">
+                    <span className="text-xs text-gray-400">
+                      Your feedback will be visible to the project team.
+                    </span>
+
+                    <button
+                      type="submit"
+                      className="btn-primary py-1.5 px-4 text-sm"
+                    >
+                      Post
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="p-4 border-t border-[#333333] bg-[#121212]">
+                  <p className="text-xs text-gray-500 text-center">
+                    You can view feedback, but only managers and clients can
+                    post feedback.
+                  </p>
                 </div>
-              </form>
+              )}
             </div>
           )}
 
@@ -1017,6 +1170,61 @@ const ProjectDetails = () => {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {revisionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#1e1e1e] border border-[#333333] rounded-xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-[#333333]">
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  Request Revision
+                </h2>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  Explain what needs to be changed before this asset can be
+                  approved.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRevisionModalOpen(false)}
+                className="text-gray-400 hover:text-white text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRevisionRequest} className="p-5">
+              <textarea
+                value={revisionText}
+                onChange={(e) => setRevisionText(e.target.value)}
+                placeholder="Describe the revisions needed..."
+                autoFocus
+                className="w-full h-32 bg-[#121212] border border-[#333333] rounded-lg p-3 text-sm text-white resize-none focus:outline-none focus:border-[#ffd166]"
+              />
+
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setRevisionModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={revisionSubmitting || !revisionText.trim()}
+                  className="bg-[#ffd166] text-[#121212] px-4 py-2 rounded-md text-sm font-bold hover:bg-[#ffdf8a] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {revisionSubmitting ? "Submitting..." : "Request Revision"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

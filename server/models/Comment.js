@@ -19,6 +19,12 @@ const commentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
+    type: {
+      type: String,
+      enum: ["comment", "revision_request"],
+      default: "comment",
+    },
   },
   {
     timestamps: true,

@@ -6,9 +6,10 @@ export const getAssetComments = async (assetId) => {
   return response.data;
 };
 
-export const createComment = async (assetId, text) => {
+export const createComment = async (assetId, text, type = "comment") => {
   const response = await api.post(`/comments/asset/${assetId}`, {
     text,
+    type,
   });
 
   return response.data;
