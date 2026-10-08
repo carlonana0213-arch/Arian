@@ -162,6 +162,13 @@ const updateTask = async (req, res) => {
       });
     }
 
+    // Only artists can mark tasks as completed/uncompleted
+    if (typeof completed === "boolean" && !isArtist) {
+      return res.status(403).json({
+        message: "Only artists can mark tasks as completed.",
+      });
+    }
+
     if (typeof completed === "boolean") {
       task.completed = completed;
       task.completedAt = completed ? new Date() : null;

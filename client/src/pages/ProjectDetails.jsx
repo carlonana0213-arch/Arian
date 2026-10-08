@@ -517,14 +517,24 @@ const ProjectDetails = () => {
             <>
               <button
                 onClick={handleReject}
-                className="bg-transparent border border-[#ff477e] text-[#ff477e] hover:bg-[#ff477e] hover:text-white py-1.5 px-4 rounded-md text-sm font-bold transition-colors"
+                disabled={!allTasksCompleted}
+                className={`bg-transparent border border-[#ff477e] text-[#ff477e] hover:bg-[#ff477e] hover:text-white py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
+                  !allTasksCompleted
+                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ff477e]"
+                    : ""
+                }`}
               >
                 Reject
               </button>
 
               <button
                 onClick={handleRequestRevision}
-                className="bg-transparent border border-[#ffd166] text-[#ffd166] hover:bg-[#ffd166] hover:text-[#121212] py-1.5 px-4 rounded-md text-sm font-bold transition-colors"
+                disabled={!allTasksCompleted}
+                className={`bg-transparent border border-[#ffd166] text-[#ffd166] hover:bg-[#ffd166] hover:text-[#121212] py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
+                  !allTasksCompleted
+                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ffd166]"
+                    : ""
+                }`}
               >
                 Request Revision
               </button>
@@ -532,8 +542,10 @@ const ProjectDetails = () => {
               <button
                 onClick={handleApprove}
                 disabled={!canReviewAsset}
-                className={`... ${
-                  !canReviewAsset ? "opacity-50 cursor-not-allowed" : ""
+                className={`bg-transparent border border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
+                  !canReviewAsset
+                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#10b981]"
+                    : ""
                 }`}
               >
                 Approve
@@ -818,8 +830,8 @@ const ProjectDetails = () => {
                         type="checkbox"
                         checked={task.completed}
                         onChange={() => handleToggleTask(task)}
-                        disabled={!isManager && !isArtist}
-                        className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer"
+                        disabled={!isArtist}
+                        className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       />
 
                       <div className="flex-1 min-w-0">
