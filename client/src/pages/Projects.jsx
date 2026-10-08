@@ -7,6 +7,8 @@ import {
   updateProject,
 } from "../services/projectService";
 import { getProjectProgress } from "../services/assetService";
+import { getUsers } from "../services/userService";
+
 const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,13 +16,36 @@ const Projects = () => {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberRole, setSelectedMemberRole] = useState("artist");
+
+  const [selectedMembers, setSelectedMembers] = useState([]);
+
   // ROLE CHECKS
 
   const isClient = user?.role === "client";
   const isManager =
     user?.role?.includes("manager") ||
     user?.role === "manager" ||
-    user?.role === "admin ";
+    user?.role === "admin";
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+
+      const data = await getUsers();
+
+      setUsers(data.users || []);
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to load users.");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   const loadProjects = async () => {
     try {
@@ -88,11 +113,18 @@ const Projects = () => {
         description: newProject.description,
         deadline: newProject.deadline,
         status: "planning",
+        client: selectedClientId || undefined,
+        members: selectedMembers,
       });
 
       await loadProjects();
 
       setIsModalOpen(false);
+
+      setSelectedClientId("");
+      setSelectedMemberId("");
+      setSelectedMemberRole("artist");
+      setSelectedMembers([]);
 
       setNewProject({
         title: "",
@@ -140,7 +172,10 @@ const Projects = () => {
         </div>
         {!isClient && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={async () => {
+              setIsModalOpen(true);
+              await loadUsers();
+            }}
             className="btn-primary py-2 px-6 shadow-lg shadow-[#9d4edd]/20 hover:shadow-[#9d4edd]/40"
           >
             + New Project
@@ -278,17 +313,140 @@ const Projects = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Client / Department
+                    Client
                   </label>
-                  <input
-                    type="text"
-                    value={newProject.client}
-                    onChange={(e) =>
-                      setNewProject({ ...newProject, client: e.target.value })
-                    }
-                    className="bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm transition-colors"
-                  />
+
+                  {usersLoading ? (
+                    <p className="text-sm text-gray-500 py-3">
+                      Loading clients...
+                    </p>
+                  ) : (
+                    <select
+                      value={selectedClientId}
+                      onChange={(e) => setSelectedClientId(e.target.value)}
+                      className="bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm transition-colors"
+                    >
+                      <option value="">No client assigned</option>
+
+                      {users
+                        .filter((user) => user.role === "client")
+                        .map((client) => (
+                          <option key={client._id} value={client._id}>
+                            {client.firstName} {client.lastName} —{" "}
+                            {client.email}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </div>
+                <div className="flex flex-col gap-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Project Members
+                  </label>
+
+                  {usersLoading ? (
+                    <p className="text-sm text-gray-500">Loading users...</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedMemberId}
+                        onChange={(e) => setSelectedMemberId(e.target.value)}
+                        className="flex-1 bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm"
+                      >
+                        <option value="">Select a team member</option>
+
+                        {users
+                          .filter(
+                            (candidate) =>
+                              candidate._id !== user?._id &&
+                              candidate.role !== "client" &&
+                              !selectedMembers.some(
+                                (member) => member.user === candidate._id,
+                              ),
+                          )
+                          .map((member) => (
+                            <option key={member._id} value={member._id}>
+                              {member.firstName} {member.lastName} —{" "}
+                              {member.role}
+                            </option>
+                          ))}
+                      </select>
+
+                      <select
+                        value={selectedMemberRole}
+                        onChange={(e) => setSelectedMemberRole(e.target.value)}
+                        className="w-36 bg-[#121212] border border-[#333333] text-white px-3 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm"
+                      >
+                        <option value="artist">Artist</option>
+                        <option value="manager">Manager</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedMemberId) return;
+
+                          setSelectedMembers((prev) => [
+                            ...prev,
+                            {
+                              user: selectedMemberId,
+                              role: selectedMemberRole,
+                            },
+                          ]);
+
+                          setSelectedMemberId("");
+                        }}
+                        className="btn-secondary px-4 py-2 text-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedMembers.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {selectedMembers.map((member) => {
+                        const memberUser = users.find(
+                          (user) => user._id === member.user,
+                        );
+
+                        if (!memberUser) return null;
+
+                        return (
+                          <div
+                            key={member.user}
+                            className="flex items-center justify-between bg-[#121212] border border-[#333333] rounded-lg px-4 py-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-white">
+                                {memberUser.firstName} {memberUser.lastName}
+                              </p>
+
+                              <p className="text-xs text-gray-500 capitalize">
+                                {member.role}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedMembers((prev) =>
+                                  prev.filter(
+                                    (item) => item.user !== member.user,
+                                  ),
+                                )
+                              }
+                              className="text-xs text-[#ff477e] hover:text-white"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Target Deadline

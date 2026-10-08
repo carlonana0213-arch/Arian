@@ -15,7 +15,7 @@ const router = express.Router();
 router.post(
   "/asset/:assetId",
   protect,
-  authorize("admin", "manager", "client"),
+  authorize("admin", "manager", "client", "artist"),
   createComment,
 );
 

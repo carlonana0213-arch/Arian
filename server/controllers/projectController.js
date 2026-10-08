@@ -4,7 +4,8 @@ const User = require("../models/User");
 //create
 const createProject = async (req, res) => {
   try {
-    const { name, description, client, startDate, deadline, status } = req.body;
+    const { name, description, client, startDate, deadline, status, members } =
+      req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -12,20 +13,55 @@ const createProject = async (req, res) => {
       });
     }
 
+    let clientUser = null;
+
+    if (client) {
+      clientUser = await User.findById(client);
+
+      if (!clientUser) {
+        return res.status(404).json({
+          message: "Selected client not found.",
+        });
+      }
+
+      if (clientUser.role !== "client") {
+        return res.status(400).json({
+          message: "Selected user is not a client.",
+        });
+      }
+    }
+
+    const projectMembers = [
+      {
+        user: req.user._id,
+        role: "manager",
+      },
+    ];
+
+    if (Array.isArray(members)) {
+      members.forEach((member) => {
+        if (
+          member?.user &&
+          ["artist", "manager", "client"].includes(member.role) &&
+          member.user.toString() !== req.user._id.toString()
+        ) {
+          projectMembers.push({
+            user: member.user,
+            role: member.role,
+          });
+        }
+      });
+    }
+
     const project = await Project.create({
       name,
       description,
       manager: req.user._id,
-      client: client || undefined,
+      client: clientUser?._id || undefined,
       startDate,
       deadline,
       status: status || "planning",
-      members: [
-        {
-          user: req.user._id,
-          role: "manager",
-        },
-      ],
+      members: projectMembers,
     });
 
     const populatedProject = await Project.findById(project._id)
