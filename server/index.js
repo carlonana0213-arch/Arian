@@ -13,6 +13,7 @@ const projectRoutes = require("./routes/projectRoutes");
 const assetRoutes = require("./routes/assetRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 connectDB();
 
@@ -61,7 +62,7 @@ app.use("/api/assets", assetRoutes);
 app.use("/api/comments", commentRoutes);
 
 app.use("/api/tasks", taskRoutes);
-
+app.use("/api/notifications", notificationRoutes);
 app.use((req, res) => {
   res.status(404).json({
     message: "Route not found",

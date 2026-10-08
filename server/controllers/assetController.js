@@ -115,6 +115,16 @@ const createAsset = async (req, res) => {
       req,
     });
 
+    const recipientIds = getProjectRecipients(project);
+
+    await createNotifications({
+      recipientIds,
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "asset_created",
+      message: `A new asset "${asset.title}" was created in project "${project.name}".`,
+    });
+
     res.status(201).json({
       message: "Asset created successfully.",
       asset: populatedAsset,

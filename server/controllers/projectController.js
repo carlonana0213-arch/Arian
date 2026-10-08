@@ -69,6 +69,26 @@ const createProject = async (req, res) => {
       .populate("client", "firstName lastName email role")
       .populate("members.user", "firstName lastName email role");
 
+    const recipientIds = [];
+
+    if (project.client) {
+      recipientIds.push(project.client);
+    }
+
+    project.members.forEach((member) => {
+      if (member.user) {
+        recipientIds.push(member.user);
+      }
+    });
+
+    await createNotifications({
+      recipientIds,
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "project_added",
+      message: `You were added to project "${project.name}".`,
+    });
+
     await createAuditLog({
       userId: req.user._id,
       action: "PROJECT_CREATED",
@@ -322,6 +342,14 @@ const addMember = async (req, res) => {
     });
 
     await project.save();
+    const createNotifications = require("../utils/createNotification");
+    await createNotifications({
+      recipientIds: [userId],
+      projectId: project._id,
+      actorId: req.user._id,
+      type: "project_added",
+      message: `You were added to project "${project.name}" as ${role}.`,
+    });
 
     await createAuditLog({
       userId: req.user._id,
