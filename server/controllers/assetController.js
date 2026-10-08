@@ -1,6 +1,7 @@
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
 const User = require("../models/User");
+const Task = require("../models/Task");
 const cloudinary = require("../config/cloudinary");
 
 const userHasProjectAccess = (project, user) => {
@@ -391,6 +392,27 @@ const approveVersion = async (req, res) => {
     if (!version) {
       return res.status(404).json({
         message: "Asset version not found.",
+      });
+    }
+
+    const totalTasks = await Task.countDocuments({
+      asset: asset._id,
+    });
+
+    const incompleteTasks = await Task.countDocuments({
+      asset: asset._id,
+      completed: false,
+    });
+
+    if (totalTasks === 0) {
+      return res.status(400).json({
+        message: "Cannot approve an asset without completed tasks.",
+      });
+    }
+
+    if (incompleteTasks > 0) {
+      return res.status(400).json({
+        message: "All tasks must be completed before approving this asset.",
       });
     }
 

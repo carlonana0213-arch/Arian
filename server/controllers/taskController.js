@@ -2,10 +2,27 @@ const Task = require("../models/Task");
 const Asset = require("../models/Asset");
 const Project = require("../models/Project");
 
+const hasProjectAccess = (project, user) => {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (project.manager && project.manager.toString() === user._id.toString()) {
+    return true;
+  }
+
+  if (project.client && project.client.toString() === user._id.toString()) {
+    return true;
+  }
+
+  return project.members.some(
+    (member) => member.user && member.user.toString() === user._id.toString(),
+  );
+};
+
 const createTask = async (req, res) => {
   try {
-    const { assetId } = req.params;
-    const { title, description, assignedTo } = req.body;
+    const { assetId, title, description, assignedTo } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({
@@ -26,6 +43,12 @@ const createTask = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         message: "Project not found",
+      });
+    }
+
+    if (!hasProjectAccess(project, req.user)) {
+      return res.status(403).json({
+        message: "You are not a member of this project.",
       });
     }
 
@@ -68,6 +91,34 @@ const createTask = async (req, res) => {
 const getAssetTasks = async (req, res) => {
   try {
     const { assetId } = req.params;
+
+    const asset = await Asset.findById(assetId);
+
+    if (!asset) {
+      return res.status(404).json({
+        message: "Asset not found",
+      });
+    }
+
+    const project = await Project.findById(asset.project);
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    if (!hasProjectAccess(project, req.user)) {
+      return res.status(403).json({
+        message: "You do not have access to this task.",
+      });
+    }
+
+    if (!hasProjectAccess(project, req.user)) {
+      return res.status(403).json({
+        message: "You do not have access to this project.",
+      });
+    }
 
     const tasks = await Task.find({
       asset: assetId,

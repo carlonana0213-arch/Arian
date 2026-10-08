@@ -13,17 +13,12 @@ const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.post(
-  "/",
-  protect,
-  authorize(["admin", "manager", "artist"]),
-  createTask,
-);
+router.post("/", protect, authorize("admin", "manager", "artist"), createTask);
 
 router.get(
   "/asset/:assetId",
   protect,
-  authorize(["admin", "manager", "artist"]),
+  authorize("admin", "manager", "artist"),
   getAssetTasks,
 );
 

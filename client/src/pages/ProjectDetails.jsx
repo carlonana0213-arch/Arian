@@ -5,12 +5,11 @@ import UploadModal from "../components/UploadModal";
 import CreateAssetModal from "../components/CreateAssetModal";
 
 import {
-  getAssetTasks,
-  updateTask,
+  getTasksByAssetId,
   createTask,
+  updateTask,
   deleteTask,
 } from "../services/taskService";
-
 import {
   addProjectMember,
   removeProjectMember,
@@ -64,8 +63,8 @@ const ProjectDetails = () => {
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
 
   const [newComment, setNewComment] = useState("");
   const commentsEndRef = useRef(null);
@@ -150,9 +149,50 @@ const ProjectDetails = () => {
     }
   };
 
+  const loadTasks = async (assetId) => {
+    if (!assetId) {
+      setTasks([]);
+      return;
+    }
+
+    try {
+      setTasksLoading(true);
+
+      const data = await getTasksByAssetId(assetId);
+
+      setTasks(data.tasks || []);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to load tasks.",
+        "error",
+      );
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTasks(selectedAssetId);
+  }, [selectedAssetId]);
+
   useEffect(() => {
     loadProject();
   }, [projectId]);
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await deleteTask(taskId);
+
+      await loadTasks(selectedAssetId);
+
+      showNotification("Task deleted successfully.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to delete task.",
+        "error",
+      );
+    }
+  };
 
   const handleProjectStatusChange = async (newStatus) => {
     if (!project) return;
@@ -177,7 +217,11 @@ const ProjectDetails = () => {
     selectedAsset?.versions?.find(
       (version) => version.versionNumber === selectedVersionNumber,
     ) || null;
+  const allTasksCompleted =
+    tasks.length > 0 && tasks.every((task) => task.completed);
 
+  const canReviewAsset =
+    isManager && selectedVersion?.status === "pending" && allTasksCompleted;
   const [comments, setComments] = useState([
     {
       id: 1,
@@ -187,9 +231,6 @@ const ProjectDetails = () => {
       time: "10 mins ago",
     },
   ]);
-
-  const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState("France");
 
   const showNotification = (message, type = "success") => {
     setToast({ message, type });
@@ -292,25 +333,52 @@ const ProjectDetails = () => {
     }
   };
 
-  const handleAddTask = (e) => {
+  const handleAddTask = async (e) => {
     e.preventDefault();
-    if (!newTaskText.trim()) return;
-    setTasks([
-      ...tasks,
-      {
-        id: Date.now(),
-        text: newTaskText,
-        assignee: newTaskAssignee,
-        completed: false,
-      },
-    ]);
-    setNewTaskText("");
+
+    if (!newTaskText.trim()) {
+      showNotification("Please enter a task.", "warning");
+      return;
+    }
+
+    if (!selectedAssetId) {
+      showNotification("Please select an asset first.", "warning");
+      return;
+    }
+
+    try {
+      await createTask(selectedAssetId, {
+        title: newTaskText.trim(),
+        assignedTo: newTaskAssignee || null,
+      });
+
+      setNewTaskText("");
+      setNewTaskAssignee("");
+
+      await loadTasks(selectedAssetId);
+
+      showNotification("Task added successfully.", "success");
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to add task.",
+        "error",
+      );
+    }
   };
 
-  const toggleTask = (id) => {
-    setTasks(
-      tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
-    );
+  const handleToggleTask = async (task) => {
+    try {
+      await updateTask(task._id, {
+        completed: !task.completed,
+      });
+
+      await loadTasks(selectedAssetId);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to update task.",
+        "error",
+      );
+    }
   };
 
   return (
@@ -463,7 +531,10 @@ const ProjectDetails = () => {
 
               <button
                 onClick={handleApprove}
-                className="btn-primary py-1.5 px-4 text-sm bg-gradient-to-r from-[#10b981] to-green-500 shadow-none hover:shadow-lg hover:shadow-[#10b981]/20 transition-all"
+                disabled={!canReviewAsset}
+                className={`... ${
+                  !canReviewAsset ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 Approve
               </button>
@@ -736,23 +807,27 @@ const ProjectDetails = () => {
                 ) : (
                   tasks.map((task) => (
                     <div
-                      key={task.id}
+                      key={task._id}
                       className="bg-[#121212] border border-[#333333] p-3 rounded-lg flex items-start gap-3 hover:border-[#9d4edd] transition-colors"
                     >
                       <input
                         type="checkbox"
                         checked={task.completed}
-                        onChange={() => toggleTask(task.id)}
+                        onChange={() => handleToggleTask(task)}
+                        disabled={!isManager && !isArtist}
                         className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
                         <p
                           className={`text-sm ${task.completed ? "text-gray-500 line-through" : "text-white"}`}
                         >
-                          {task.text}
+                          {task.title}
                         </p>
                         <span className="inline-block mt-2 px-2 py-0.5 bg-[#1e1e1e] text-gray-400 text-[10px] rounded border border-[#333333] uppercase font-bold tracking-wider">
-                          @ {task.assignee}
+                          @
+                          {task.assignedTo
+                            ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
+                            : "Unassigned"}
                         </span>
                       </div>
                     </div>
@@ -777,9 +852,9 @@ const ProjectDetails = () => {
                     onChange={(e) => setNewTaskAssignee(e.target.value)}
                     className="flex-1 bg-[#1e1e1e] text-gray-300 border border-[#333333] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#ffd166] cursor-pointer"
                   >
-                    {teamMembers.map((m) => (
-                      <option key={m.id} value={m.name.split(" ")[0]}>
-                        {m.name}
+                    {project?.members?.map((member) => (
+                      <option key={member.user._id} value={member.user._id}>
+                        {member.user.firstName} {member.user.lastName}
                       </option>
                     ))}
                   </select>
