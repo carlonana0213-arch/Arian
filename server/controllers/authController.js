@@ -39,8 +39,8 @@ const register = async (req, res) => {
 
     await createAuditLog({
       userId: user._id,
-      action: "LOGIN_SUCCESS",
-      details: "Successful account login.",
+      action: "ACCOUNT_CREATED",
+      details: "Account was created successfully.",
       req,
     });
 
@@ -101,6 +101,13 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user._id);
+
+    await createAuditLog({
+      userId: user._id,
+      action: "LOGIN_SUCCESS",
+      details: "Successful account login.",
+      req,
+    });
 
     res.json({
       message: "Login successful.",

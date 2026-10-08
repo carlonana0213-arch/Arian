@@ -32,6 +32,50 @@ const Profile = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(true);
 
+  const getActivityPresentation = (log) => {
+    switch (log.action) {
+      case "LOGIN_SUCCESS":
+        return {
+          icon: "🔐",
+          title: "Signed into Arian",
+          subtitle: "Successful account login",
+        };
+
+      case "PROFILE_UPDATED":
+        return {
+          icon: "👤",
+          title: "Updated profile information",
+          subtitle: log.details,
+        };
+
+      case "PASSWORD_CHANGED":
+        return {
+          icon: "🔑",
+          title: "Changed account password",
+          subtitle: log.details,
+        };
+
+      case "ACCOUNT_CREATED":
+        return {
+          icon: "✨",
+          title: "Created Arian account",
+          subtitle: log.details,
+        };
+
+      default:
+        return {
+          icon: "📝",
+          title: log.action
+            .replaceAll("_", " ")
+            .toLowerCase()
+            .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+          subtitle: log.details || "System activity recorded",
+        };
+    }
+  };
+
+  const recentActivities = auditLogs.slice(0, 3);
+
   useEffect(() => {
     if (!user) return;
 
@@ -239,14 +283,72 @@ const Profile = () => {
                 </p>
               )}
 
-              <h3 className="text-lg font-bold text-white mt-8 mb-4">
+              {/* <h3 className="text-lg font-bold text-white mt-8 mb-4">
                 Contact Information
-              </h3>
+              </h3>*/}
 
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between border-b border-[#333333] pb-2">
-                  <span className="text-gray-400">Department</span>
+                <h3 className="text-lg font-bold text-white mt-8 mb-4">
+                  Change Password
+                </h3>
 
+                <form onSubmit={handleChangePassword} className="space-y-3">
+                  <input
+                    type="password"
+                    required
+                    value={passwordData.currentPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        currentPassword: e.target.value,
+                      })
+                    }
+                    placeholder="Current password"
+                    className="profile-input w-full"
+                  />
+
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={passwordData.newPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        newPassword: e.target.value,
+                      })
+                    }
+                    placeholder="New password"
+                    className="profile-input w-full"
+                  />
+
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                    placeholder="Confirm new password"
+                    className="profile-input w-full"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={passwordLoading}
+                    className="btn-secondary w-full py-2"
+                  >
+                    {passwordLoading
+                      ? "Changing Password..."
+                      : "Change Password"}
+                  </button>
+                </form>
+                <div className="flex justify-between border-b border-[#333333] pb-2">
+                  {/* <span className="text-gray-400">Department</span> 
                   {isEditing ? (
                     <input
                       value={profileData.department}
@@ -262,69 +364,53 @@ const Profile = () => {
                     <span className="text-white">
                       {profileData.department || "Not specified"}
                     </span>
-                  )}
+                  )}*/}
                 </div>
               </div>
             </div>
 
             <div>
               <h3 className="text-lg font-bold text-white mb-4">
-                Change Password
+                Recent Studio Activity
               </h3>
 
-              <form onSubmit={handleChangePassword} className="space-y-3">
-                <input
-                  type="password"
-                  required
-                  value={passwordData.currentPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      currentPassword: e.target.value,
-                    })
-                  }
-                  placeholder="Current password"
-                  className="profile-input w-full"
-                />
+              <div className="space-y-4">
+                {auditLoading ? (
+                  <p className="text-sm text-gray-500">
+                    Loading recent activity...
+                  </p>
+                ) : recentActivities.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No recent activity recorded.
+                  </p>
+                ) : (
+                  recentActivities.map((log) => {
+                    const activity = getActivityPresentation(log);
 
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={passwordData.newPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      newPassword: e.target.value,
-                    })
-                  }
-                  placeholder="New password"
-                  className="profile-input w-full"
-                />
+                    return (
+                      <div key={log._id} className="flex gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-[#121212] border border-[#333333] flex items-center justify-center text-lg shrink-0">
+                          {activity.icon}
+                        </div>
 
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={passwordData.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  placeholder="Confirm new password"
-                  className="profile-input w-full"
-                />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white">
+                            {activity.title}
+                          </p>
 
-                <button
-                  type="submit"
-                  disabled={passwordLoading}
-                  className="btn-secondary w-full py-2"
-                >
-                  {passwordLoading ? "Changing Password..." : "Change Password"}
-                </button>
-              </form>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {activity.subtitle}
+                          </p>
+
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
 
