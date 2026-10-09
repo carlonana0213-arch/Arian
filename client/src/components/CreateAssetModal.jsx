@@ -20,7 +20,7 @@ const CreateAssetModal = ({ isOpen, onClose, projectId, onCreated }) => {
     }
 
     if (!file) {
-      setError("Please select an image.");
+      setError("Please select a file.");
       return;
     }
 
@@ -32,7 +32,7 @@ const CreateAssetModal = ({ isOpen, onClose, projectId, onCreated }) => {
         title: title.trim(),
         description,
         assetType,
-        image: file,
+        file: file, // Matches the updated assetService
       });
 
       setTitle("");
@@ -126,14 +126,13 @@ const CreateAssetModal = ({ isOpen, onClose, projectId, onCreated }) => {
 
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Image
+              File
             </label>
 
             <input
               type="file"
-              accept="image/*"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="w-full mt-1 text-sm text-gray-400"
+              className="w-full mt-1 text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#1e1e1e] file:text-white hover:file:bg-[#252525] cursor-pointer"
             />
           </div>
 

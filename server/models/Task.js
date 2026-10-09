@@ -34,6 +34,11 @@ const taskSchema = new mongoose.Schema(
       default: null,
     },
 
+    deadline: {
+      type: Date,
+      default: null,
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -52,7 +57,7 @@ const taskSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 module.exports = mongoose.model("Task", taskSchema);

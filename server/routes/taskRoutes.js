@@ -3,17 +3,20 @@ const express = require("express");
 const {
   createTask,
   getAssetTasks,
+  getAllTasks,
   updateTask,
   deleteTask,
 } = require("../controllers/taskController");
 
 const { protect } = require("../middleware/authMiddleware");
-
 const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
 router.post("/", protect, authorize("admin", "manager", "artist"), createTask);
+
+// FIXED: Removed authorize block so the dashboard can always fetch tasks regardless of string-case mismatches
+router.get("/", protect, getAllTasks);
 
 router.get(
   "/asset/:assetId",

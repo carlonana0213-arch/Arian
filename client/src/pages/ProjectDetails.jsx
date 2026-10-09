@@ -1,10 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UploadModal from "../components/UploadModal";
 import CreateAssetModal from "../components/CreateAssetModal";
-
-import { getUsers } from "../services/userService";
 
 import {
   getTasksByAssetId,
@@ -13,12 +11,7 @@ import {
   deleteTask,
 } from "../services/taskService";
 
-import {
-  addProjectMember,
-  removeProjectMember,
-  getProjectById,
-  updateProject,
-} from "../services/projectService";
+import { getProjectById } from "../services/projectService";
 
 import {
   getProjectAssets,
@@ -28,16 +21,13 @@ import {
 } from "../services/assetService";
 
 import { getAssetComments, createComment } from "../services/commentService";
-const ProjectDetails = () => {
-  const { id: projectId, assetId } = useParams();
-  const { user } = useAuth();
 
-  //user management state
-  const [users, setUsers] = useState([]);
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [selectedMemberRole, setSelectedMemberRole] = useState("artist");
-  const [memberLoading, setMemberLoading] = useState(false);
-  const [usersLoading, setUsersLoading] = useState(false);
+const ProjectDetails = () => {
+  const params = useParams();
+  const projectId = params.projectId || params.id;
+  const assetId = params.assetId;
+  const location = useLocation();
+  const { user } = useAuth();
 
   // Robust role checking
   const isAdmin = user?.role === "admin";
@@ -45,7 +35,7 @@ const ProjectDetails = () => {
   const isArtist = user?.role === "artist";
   const isClient = user?.role === "client";
 
-  //project state
+  // project state
   const [project, setProject] = useState(null);
   const [assets, setAssets] = useState([]);
   const [assetLoading, setAssetLoading] = useState(true);
@@ -61,50 +51,34 @@ const ProjectDetails = () => {
   const [activeTab, setActiveTab] = useState("comments");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isCreateAssetModalOpen, setIsCreateAssetModalOpen] = useState(false);
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
-  const [newMemberEmail, setNewMemberEmail] = useState("");
+  
+  // Reject Modal State
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectingLoading, setRejectingLoading] = useState(false);
+  
   const [toast, setToast] = useState(null);
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  
+  // Updated task inputs
   const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
+  const [newTaskDeadline, setNewTaskDeadline] = useState("");
 
   const [newComment, setNewComment] = useState("");
   const commentsEndRef = useRef(null);
 
-  const loadUsers = async () => {
-    try {
-      setUsersLoading(true);
-
-      const data = await getUsers();
-
-      setUsers(data.users || []);
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to load users.",
-        "error",
-      );
-    } finally {
-      setUsersLoading(false);
+  // Tab Listener for Dashboard Navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get("tab");
+    if (tab === "tasks" || tab === "comments") {
+      setActiveTab(tab);
     }
-  };
-
-  const handleOpenTeamModal = async () => {
-    setIsTeamModalOpen(true);
-
-    if (isManager) {
-      try {
-        const response = await getUsers();
-        setUsers(response.users || []);
-      } catch (error) {
-        showNotification(
-          error.response?.data?.message || "Failed to load users.",
-          "error",
-        );
-      }
-    }
-  };
+  }, [location.search]);
+  
   const loadProject = async () => {
     try {
       setLoading(true);
@@ -210,49 +184,20 @@ const ProjectDetails = () => {
     loadProject();
   }, [projectId, assetId]);
 
-  const handleDeleteTask = async (taskId) => {
-    try {
-      await deleteTask(taskId);
-
-      await loadTasks(selectedAssetId);
-
-      showNotification("Task deleted successfully.", "success");
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to delete task.",
-        "error",
-      );
-    }
-  };
-
-  const handleProjectStatusChange = async (newStatus) => {
-    if (!project) return;
-
-    try {
-      await updateProject(project._id, {
-        status: newStatus,
-      });
-
-      await loadProject();
-
-      showNotification("Project status updated.", "success");
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to update project status.",
-        "error",
-      );
-    }
-  };
-
   const selectedVersion =
     selectedAsset?.versions?.find(
       (version) => version.versionNumber === selectedVersionNumber,
     ) || null;
-  const allTasksCompleted =
-    tasks.length > 0 && tasks.every((task) => task.completed);
+    
+  const allTasksCompleted = tasks.every((task) => task.completed);
+
+  // Dynamic task progress calculations
+  const totalTasks = tasks.length;
+  const completedTasksCount = tasks.filter((task) => task.completed).length;
+  const taskProgress = totalTasks === 0 ? 0 : Math.round((completedTasksCount / totalTasks) * 100);
 
   const canReviewAsset =
-    isManager && selectedVersion?.status === "pending" && allTasksCompleted;
+    (isManager || isClient) && selectedVersion?.status === "pending" && allTasksCompleted;
 
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -289,8 +234,8 @@ const ProjectDetails = () => {
       return;
     }
 
-    if (!isManager) {
-      showNotification("Only managers can request revisions.", "error");
+    if (!isManager && !isClient) {
+      showNotification("Only managers and clients can request revisions.", "error");
       return;
     }
 
@@ -343,11 +288,26 @@ const ProjectDetails = () => {
     }
   };
 
-  const handleReject = async () => {
-    showNotification(
-      "Rejection comments will be connected in the review workflow.",
-      "warning",
-    );
+  const handleReject = () => {
+    if (!selectedAsset) return;
+    setIsRejectModalOpen(true);
+  };
+
+  const confirmRejectAsset = async () => {
+    try {
+      setRejectingLoading(true);
+      await rejectVersion(selectedAsset._id, selectedAsset.currentVersion);
+      await loadProject();
+      showNotification("Asset successfully rejected.", "success");
+      setIsRejectModalOpen(false);
+    } catch (error) {
+      showNotification(
+        error.response?.data?.message || "Failed to reject asset.",
+        "error",
+      );
+    } finally {
+      setRejectingLoading(false);
+    }
   };
 
   const handlePostComment = async (e) => {
@@ -391,56 +351,11 @@ const ProjectDetails = () => {
     }
   };
 
-  const handleAddMember = async () => {
-    if (!selectedMemberId) {
-      showNotification("Please select a user.", "warning");
-      return;
-    }
-
-    try {
-      setMemberLoading(true);
-
-      await addProjectMember(projectId, selectedMemberId, selectedMemberRole);
-
-      await loadProject();
-
-      setSelectedMemberId("");
-
-      showNotification("Team member added successfully.", "success");
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to add team member.",
-        "error",
-      );
-    } finally {
-      setMemberLoading(false);
-    }
-  };
-
-  const handleRemoveMember = async (userId) => {
-    try {
-      setMemberLoading(true);
-
-      await removeProjectMember(projectId, userId);
-
-      await loadProject();
-
-      showNotification("Team member removed.", "success");
-    } catch (error) {
-      showNotification(
-        error.response?.data?.message || "Failed to remove team member.",
-        "error",
-      );
-    } finally {
-      setMemberLoading(false);
-    }
-  };
-
   const handleAddTask = async (e) => {
     e.preventDefault();
 
     if (!newTaskText.trim()) {
-      showNotification("Please enter a task.", "warning");
+      showNotification("Please enter a task title.", "warning");
       return;
     }
 
@@ -452,11 +367,15 @@ const ProjectDetails = () => {
     try {
       await createTask(selectedAssetId, {
         title: newTaskText.trim(),
+        description: newTaskDescription.trim(),
         assignedTo: newTaskAssignee || null,
+        deadline: newTaskDeadline || null,
       });
 
       setNewTaskText("");
+      setNewTaskDescription("");
       setNewTaskAssignee("");
+      setNewTaskDeadline("");
 
       await loadTasks(selectedAssetId);
 
@@ -509,122 +428,92 @@ const ProjectDetails = () => {
         </div>
       )}
 
-      <header className="bg-[#1e1e1e] border-b border-[#333333] px-8 py-4 flex justify-between items-center z-10">
-        <div className="flex items-center gap-4">
+      {/* STREAMLINED HEADER */}
+      <header className="bg-[#1e1e1e] border-b border-[#333333] px-8 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 z-10">
+        <div className="flex items-center gap-6">
           <Link
-            to={`/project/${projectId}`}
+            to="/projects"
             className="text-gray-400 hover:text-[#9d4edd] text-sm font-medium transition-colors"
           >
             &larr; Back
           </Link>
-          <div className="h-4 w-px bg-[#333333]"></div>
-          {/*  <h1 className="text-xl font-bold text-white">
-            {selectedAsset?.title || project?.name || "Project Details"}
-          </h1>*/}
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-              Project Status
-            </p>
+          <div className="h-4 w-px bg-[#333333] hidden md:block"></div>
 
-            <p className="text-sm text-white font-mono mt-0.5 capitalize">
-              {isManager && project && (
-                <select
-                  value={project.status}
-                  onChange={(e) => handleProjectStatusChange(e.target.value)}
-                  className="bg-[#121212] text-white border border-[#333333] rounded-md px-3 py-1.5 text-sm outline-none focus:border-[#9d4edd]"
-                >
-                  <option value="planning">Planning</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                  <option value="archived">Archived</option>
-                </select>
-              )}
-            </p>
-          </div>
-          <div className="w-full max-w-5xl mb-8">
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest">
-                  Project Progress
-                  <span className="text-sm font-bold text-white">
-                    {progress?.progress || 0}%
-                  </span>
-                </p>
-
-                <p className="text-sm text-gray-500 mt-1">
-                  {progress?.approvedAssets || 0} of{" "}
-                  {progress?.totalAssets || 0} assets approved
-                </p>
+          {/* DYNAMIC TASK PROGRESS BLOCK */}
+          <div className="flex items-center gap-4 bg-[#121212] border border-[#333333] px-4 py-2 rounded-xl">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">
+                  Task Progress
+                </span>
+                <span className="text-xs font-mono font-bold text-white">
+                  {taskProgress}%
+                </span>
               </div>
+              <p className="text-[11px] text-gray-500">
+                {completedTasksCount} of {totalTasks} tasks completed
+              </p>
             </div>
-
-            <div className="w-full bg-[#1e1e1e] border border-[#333333] rounded-full h-3 overflow-hidden">
+            <div className="w-24 bg-[#1e1e1e] border border-[#333333] rounded-full h-2 overflow-hidden hidden sm:block">
               <div
                 className="bg-gradient-to-r from-[#9d4edd] to-[#ff477e] h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${progress?.progress || 0}%`,
+                  width: `${taskProgress}%`,
                 }}
               />
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 items-center">
-          <span
-            className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider border
-  ${
-    selectedVersion?.status === "approved"
-      ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
-      : selectedVersion?.status === "rejected"
-        ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
-        : "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
-  }`}
-          >
-            {selectedVersion?.status || "pending"}
-          </span>
+        {/* CLEAN ROLE-BASED ACTIONS */}
+        <div className="flex flex-wrap gap-3 items-center">
+          {selectedAsset && (
+            <span
+              className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider border font-mono
+              ${
+                selectedVersion?.status === "approved"
+                  ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
+                  : selectedVersion?.status === "rejected"
+                    ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
+                    : "bg-[#ffd166]/10 text-[#ffd166] border-[#ffd166]/30"
+              }`}
+            >
+              {selectedVersion?.status || "pending"}
+            </span>
+          )}
 
-          {(isManager || isAdmin) && (
-            <button
-              onClick={async () => {
-                setIsTeamModalOpen(true);
-                await loadUsers();
-              }}
-              className="btn-secondary py-1.5 px-4 text-sm mr-2 flex items-center gap-2"
-            >
-              <span>⚙</span> Manage Team
-            </button>
-          )}
-          {(isManager || isArtist) && (
-            <button
-              onClick={() => setIsCreateAssetModalOpen(true)}
-              className="btn-primary py-1.5 px-4 text-sm"
-            >
-              + New Asset
-            </button>
-          )}
+          {/* ARTIST or MANAGER/ADMIN: Allow Upload Revision & Create Asset */}
           {(isArtist || isManager) && (
-            <button
-              onClick={() => {
-                if (!selectedAsset) return;
+            <>
+              <button
+                onClick={() => setIsCreateAssetModalOpen(true)}
+                className="btn-primary py-1.5 px-4 text-sm shadow-lg shadow-[#9d4edd]/20 hover:shadow-[#9d4edd]/40"
+              >
+                + New Asset
+              </button>
 
-                setSelectedAssetId(selectedAsset._id);
-                setIsUploadModalOpen(true);
-              }}
-              className="btn-secondary py-1.5 px-4 text-sm"
-            >
-              Upload Revision
-            </button>
+              {selectedAsset && (
+                <button
+                  onClick={() => {
+                    setSelectedAssetId(selectedAsset._id);
+                    setIsUploadModalOpen(true);
+                  }}
+                  className="btn-secondary py-1.5 px-4 text-sm"
+                >
+                  Upload Revision
+                </button>
+              )}
+            </>
           )}
 
-          {isManager && selectedVersion?.status === "pending" && (
+          {/* CLIENT / MANAGER: Review Actions */}
+          {(isManager || isClient) && selectedAsset && selectedVersion?.status === "pending" && (
             <>
               <button
                 onClick={handleReject}
                 disabled={!allTasksCompleted}
                 className={`bg-transparent border border-[#ff477e] text-[#ff477e] hover:bg-[#ff477e] hover:text-white py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
-                  !allTasksCompleted
-                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ff477e]"
-                    : ""
+                  !allTasksCompleted ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ff477e]" : ""
                 }`}
               >
                 Reject
@@ -634,9 +523,7 @@ const ProjectDetails = () => {
                 onClick={handleRequestRevision}
                 disabled={!allTasksCompleted}
                 className={`bg-transparent border border-[#ffd166] text-[#ffd166] hover:bg-[#ffd166] hover:text-[#121212] py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
-                  !allTasksCompleted
-                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ffd166]"
-                    : ""
+                  !allTasksCompleted ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#ffd166]" : ""
                 }`}
               >
                 Request Revision
@@ -646,9 +533,7 @@ const ProjectDetails = () => {
                 onClick={handleApprove}
                 disabled={!canReviewAsset}
                 className={`bg-transparent border border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white py-1.5 px-4 rounded-md text-sm font-bold transition-colors ${
-                  !canReviewAsset
-                    ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#10b981]"
-                    : ""
+                  !canReviewAsset ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-[#10b981]" : ""
                 }`}
               >
                 Approve
@@ -669,10 +554,18 @@ const ProjectDetails = () => {
             <p className="text-[#ff477e]">{assetError}</p>
           </div>
         ) : assets.length === 0 ? (
-          <div className="w-full flex-1 flex items-center justify-center">
+          <div className="w-full flex-1 flex items-center justify-center flex-col gap-4">
             <p className="text-gray-400">
               No assets have been uploaded to this project yet.
             </p>
+            {(isArtist || isManager) && (
+              <button
+                onClick={() => setIsCreateAssetModalOpen(true)}
+                className="btn-primary py-2 px-6 text-sm"
+              >
+                + Create First Asset
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex-1 bg-[#121212] p-8 flex flex-col items-center overflow-y-auto">
@@ -693,7 +586,6 @@ const ProjectDetails = () => {
               )}
             </div>
 
-            {/* Restructured Layout: Description/Metadata on Left, Version Tracker on Right */}
             <div className="w-full max-w-5xl mt-8 flex flex-col md:flex-row justify-between items-start gap-8 pb-12">
               <div className="flex-1">
                 <h2 className="text-3xl font-bold text-white">
@@ -725,7 +617,6 @@ const ProjectDetails = () => {
                   </p>
                 </div>
 
-                {/* Clean Grid Layout for Metadata */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 bg-[#1a1a1a] border border-[#333333] rounded-xl p-5 shadow-inner max-w-2xl">
                   <div>
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
@@ -806,7 +697,7 @@ const ProjectDetails = () => {
               className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === "comments" ? "text-[#ffd166] border-b-2 border-[#ffd166]" : "text-gray-400 hover:text-white"}`}
               onClick={() => setActiveTab("comments")}
             >
-              Feedback
+              Feedback & Activity
             </button>
             <button
               className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === "tasks" ? "text-[#ffd166] border-b-2 border-[#ffd166]" : "text-gray-400 hover:text-white"}`}
@@ -821,81 +712,95 @@ const ProjectDetails = () => {
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {commentsLoading ? (
                   <p className="text-sm text-gray-500 text-center mt-4">
-                    Loading feedback...
+                    Loading activity...
                   </p>
                 ) : comments.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center mt-4">
-                    No feedback yet.
+                    No activity or feedback yet.
                   </p>
                 ) : (
                   comments.map((comment) => {
-                    const isRevisionRequest =
-                      comment.type === "revision_request";
+                    const isRevisionRequest = comment.type === "revision_request";
+                    const isRevisionUpload = comment.type === "revision_upload";
 
                     const firstName = comment.user?.firstName || "";
                     const lastName = comment.user?.lastName || "";
+                    const fullName = `${firstName} ${lastName}`.trim() || "Unknown User";
+                    const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+                    const formattedTime = comment.createdAt ? new Date(comment.createdAt).toLocaleString() : "";
 
-                    const fullName =
-                      `${firstName} ${lastName}`.trim() || "Unknown User";
-
-                    const initials =
-                      `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
-                      "U";
-
-                    const formattedTime = comment.createdAt
-                      ? new Date(comment.createdAt).toLocaleString()
-                      : "";
-
-                    return isRevisionRequest ? (
-                      <div
-                        key={comment._id}
-                        className="border border-[#ffd166]/50 bg-[#ffd166]/10 rounded-lg p-4 shadow-md"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-full bg-[#ffd166] text-[#121212] flex items-center justify-center text-xs font-bold shrink-0">
-                            ↻
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <div>
-                                <p className="text-sm font-bold text-[#ffd166]">
-                                  Revision Request
-                                </p>
-
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {fullName}
-                                </p>
-                              </div>
-
-                              <span className="text-[10px] text-gray-500 whitespace-nowrap">
-                                {formattedTime}
-                              </span>
+                    if (isRevisionRequest) {
+                      return (
+                        <div
+                          key={comment._id}
+                          className="border border-[#ffd166]/50 bg-[#ffd166]/10 rounded-lg p-4 shadow-md"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#ffd166] text-[#121212] flex items-center justify-center text-xs font-bold shrink-0">
+                              ↻
                             </div>
-
-                            <p className="text-sm text-white leading-relaxed bg-[#121212]/70 border border-[#ffd166]/20 rounded-md p-3">
-                              {comment.text}
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div>
+                                  <p className="text-sm font-bold text-[#ffd166]">
+                                    Revision Request
+                                  </p>
+                                  <p className="text-xs text-gray-400 mt-0.5">{fullName}</p>
+                                </div>
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                  {formattedTime}
+                                </span>
+                              </div>
+                              <p className="text-sm text-white leading-relaxed bg-[#121212]/70 border border-[#ffd166]/20 rounded-md p-3">
+                                {comment.text}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
+                      );
+                    }
+
+                    if (isRevisionUpload) {
+                      return (
+                        <div
+                          key={comment._id}
+                          className="border border-[#9d4edd]/50 bg-[#9d4edd]/10 rounded-lg p-4 shadow-md"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#9d4edd] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                              🚀
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div>
+                                  <p className="text-sm font-bold text-[#9d4edd]">
+                                    Revision Upload
+                                  </p>
+                                  <p className="text-xs text-gray-400 mt-0.5">{fullName}</p>
+                                </div>
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                  {formattedTime}
+                                </span>
+                              </div>
+                              <p className="text-sm text-white leading-relaxed bg-[#121212]/70 border border-[#9d4edd]/20 rounded-md p-3">
+                                {comment.text}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div key={comment._id} className="flex gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9d4edd] to-[#ff477e] flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
                           {initials}
                         </div>
-
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 mb-1">
-                            <span className="font-semibold text-sm text-white">
-                              {fullName}
-                            </span>
-
-                            <span className="text-xs text-gray-400">
-                              {formattedTime}
-                            </span>
+                            <span className="font-semibold text-sm text-white">{fullName}</span>
+                            <span className="text-xs text-gray-400">{formattedTime}</span>
                           </div>
-
                           <p className="text-sm text-white leading-relaxed bg-[#121212] p-3 rounded-r-lg rounded-bl-lg border border-[#333333]">
                             {comment.text}
                           </p>
@@ -936,8 +841,7 @@ const ProjectDetails = () => {
               ) : (
                 <div className="p-4 border-t border-[#333333] bg-[#121212]">
                   <p className="text-xs text-gray-500 text-center">
-                    You can view feedback, but only managers and clients can
-                    post feedback.
+                    You can view activity and feedback.
                   </p>
                 </div>
               )}
@@ -965,27 +869,36 @@ const ProjectDetails = () => {
                         type="checkbox"
                         checked={task.completed}
                         onChange={() => handleToggleTask(task)}
-                        disabled={!isArtist}
-                        className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!isArtist && !isManager && !isAdmin}
+                        className="mt-1 w-4 h-4 accent-[#9d4edd] cursor-pointer"
                       />
 
                       <div className="flex-1 min-w-0">
-                        <p
-                          className={`text-sm ${
-                            task.completed
-                              ? "text-gray-500 line-through"
-                              : "text-white"
-                          }`}
-                        >
+                        <p className={`text-sm font-semibold ${task.completed ? "text-gray-500 line-through" : "text-white"}`}>
                           {task.title}
                         </p>
+                        
+                        {task.description && (
+                          <p className={`text-xs mt-1 ${task.completed ? "text-gray-600 line-through" : "text-gray-400"}`}>
+                            {task.description}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="inline-block px-2 py-0.5 bg-[#1e1e1e] text-gray-400 text-[10px] rounded border border-[#333333] uppercase font-bold tracking-wider">
+                            @{task.assignedTo ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : "Unassigned"}
+                          </span>
 
-                        <span className="inline-block mt-2 px-2 py-0.5 bg-[#1e1e1e] text-gray-400 text-[10px] rounded border border-[#333333] uppercase font-bold tracking-wider">
-                          @
-                          {task.assignedTo
-                            ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                            : "Unassigned"}
-                        </span>
+                          {task.deadline && (
+                            <span className={`inline-block px-2 py-0.5 text-[10px] rounded border uppercase font-bold tracking-wider ${
+                              new Date(task.deadline) < new Date() && !task.completed
+                                ? "bg-[#ff477e]/10 text-[#ff477e] border-[#ff477e]/30"
+                                : "bg-[#1e1e1e] text-gray-400 border-[#333333]"
+                            }`}>
+                              Deadline: {new Date(task.deadline).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -998,28 +911,45 @@ const ProjectDetails = () => {
               >
                 <input
                   type="text"
-                  placeholder="Add a new task..."
+                  placeholder="Task title..."
                   value={newTaskText}
                   onChange={(e) => setNewTaskText(e.target.value)}
                   className="w-full bg-[#1e1e1e] text-white border border-[#333333] rounded-md p-3 text-sm focus:outline-none focus:border-[#ffd166] transition-colors"
                 />
+                
+                <textarea
+                  placeholder="Task description or notes (optional)..."
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  className="w-full bg-[#1e1e1e] text-white border border-[#333333] rounded-md p-3 text-sm resize-none focus:outline-none focus:border-[#ffd166] transition-colors h-16"
+                />
+
                 <div className="flex gap-2">
                   <select
                     value={newTaskAssignee}
                     onChange={(e) => setNewTaskAssignee(e.target.value)}
                     className="flex-1 bg-[#1e1e1e] text-gray-300 border border-[#333333] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#ffd166] cursor-pointer"
                   >
+                    <option value="">Unassigned</option>
                     {project?.members?.map((member) => (
                       <option key={member.user._id} value={member.user._id}>
                         {member.user.firstName} {member.user.lastName}
                       </option>
                     ))}
                   </select>
+                  
+                  <input
+                    type="date"
+                    value={newTaskDeadline}
+                    onChange={(e) => setNewTaskDeadline(e.target.value)}
+                    className="flex-1 bg-[#1e1e1e] text-white border border-[#333333] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#ffd166] cursor-pointer [color-scheme:dark]"
+                  />
+                  
                   <button
                     type="submit"
                     className="bg-transparent border border-[#ffd166] text-[#ffd166] hover:bg-[#ffd166] hover:text-[#121212] py-2 px-4 rounded-md text-sm font-bold transition-colors"
                   >
-                    Add Task
+                    Add
                   </button>
                 </div>
               </form>
@@ -1042,114 +972,48 @@ const ProjectDetails = () => {
         onCreated={loadProject}
       />
 
-      {isTeamModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-colors duration-300 p-4">
-          <div className="glass-panel w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setIsTeamModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-            >
-              ✕
-            </button>
-            <h2 className="text-2xl font-bold mb-1 text-white">
-              Manage Project Team
-            </h2>
-            <p className="text-gray-400 text-sm mb-6">
-              Add or remove members from this production.
-            </p>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-white">Current Team</h3>
-
-              {project?.members?.length ? (
-                project.members.map((member) => (
-                  <div
-                    key={member.user?._id}
-                    className="flex items-center justify-between bg-[#121212] border border-[#333333] rounded-lg p-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-white">
-                        {member.user?.firstName} {member.user?.lastName}
-                      </p>
-
-                      <p className="text-xs text-gray-500">
-                        {member.user?.email}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400 capitalize">
-                        {member.role}
-                      </span>
-
-                      {member.user?._id !== project.manager?._id && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMember(member.user._id)}
-                          disabled={memberLoading}
-                          className="text-xs text-red-400 hover:text-red-300"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">
-                  No team members assigned.
+      {/* Reject Asset Modal */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#1e1e1e] border border-[#333333] rounded-xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-5 border-b border-[#333333]">
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  Reject Asset Version
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  This action will mark the current version as rejected.
                 </p>
-              )}
-              <div className="mt-6 pt-6 border-t border-[#333333]">
-                <h3 className="text-sm font-semibold text-white mb-4">
-                  Add Team Member
-                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRejectModalOpen(false)}
+                className="text-gray-400 hover:text-white text-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-300 mb-6">
+                Are you sure you want to reject <span className="font-bold text-white">{selectedAsset?.title} (v{selectedAsset?.currentVersion})</span>? The artist will need to upload a new revision.
+              </p>
 
-                {usersLoading ? (
-                  <p className="text-sm text-gray-500">Loading users...</p>
-                ) : (
-                  <div className="space-y-4">
-                    <select
-                      value={selectedMemberId}
-                      onChange={(e) => setSelectedMemberId(e.target.value)}
-                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
-                    >
-                      <option value="">Select user</option>
-
-                      {users
-                        .filter(
-                          (user) =>
-                            !project?.members?.some(
-                              (member) => member.user?._id === user._id,
-                            ),
-                        )
-                        .map((user) => (
-                          <option key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName} — {user.role}
-                          </option>
-                        ))}
-                    </select>
-
-                    <select
-                      value={selectedMemberRole}
-                      onChange={(e) => setSelectedMemberRole(e.target.value)}
-                      className="w-full bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd]"
-                    >
-                      <option value="artist">Artist</option>
-                      <option value="manager">Manager</option>
-                      <option value="client">Client</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={handleAddMember}
-                      disabled={memberLoading || !selectedMemberId}
-                      className="btn-primary w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {memberLoading ? "Adding..." : "Add Member"}
-                    </button>
-                  </div>
-                )}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRejectAsset}
+                  disabled={rejectingLoading}
+                  className="bg-[#ff477e] text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-[#e03e6f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {rejectingLoading ? "Rejecting..." : "Confirm Rejection"}
+                </button>
               </div>
             </div>
           </div>

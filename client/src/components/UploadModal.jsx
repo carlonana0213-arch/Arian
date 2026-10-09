@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { uploadNewVersion } from "../services/assetService";
+
 const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
@@ -50,7 +51,7 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
       setUploading(true);
       setError("");
 
-      await uploadNewVersion(assetId, file);
+      await uploadNewVersion(assetId, file, note);
 
       setFile(null);
       setNote("");
@@ -70,6 +71,7 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
     setNote("");
     onClose();
   };
+
   if (!isOpen) {
     return null;
   }
@@ -120,21 +122,23 @@ const UploadModal = ({ isOpen, onClose, assetId, onUploaded }) => {
                   Click to upload or drag and drop
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  PNG, JPG or WebP (max. 10MB)
+                  Any supported file type (max. 50MB)
                 </p>
               </>
             )}
           </div>
+
           {error && <p className="text-sm text-[#ff477e]">{error}</p>}
+
           <div className="flex flex-col gap-1.5 mt-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Version Notes (Optional)
+              Asset Description
             </label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="What changed in this version?"
-              className="bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm h-20 resize-none"
+              placeholder="Enter updated asset description..."
+              className="bg-[#121212] border border-[#333333] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9d4edd] text-sm h-24 resize-none"
             />
           </div>
 

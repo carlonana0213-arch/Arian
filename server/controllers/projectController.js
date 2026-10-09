@@ -6,7 +6,7 @@ const getProjectRecipients = require("../utils/getProjectRecipients");
 //create
 const createProject = async (req, res) => {
   try {
-    const { name, description, client, startDate, deadline, status, members } =
+    const { name, description, client, startDate, deadline, priority, status, members } =
       req.body;
 
     if (!name) {
@@ -62,6 +62,7 @@ const createProject = async (req, res) => {
       client: clientUser?._id || undefined,
       startDate,
       deadline,
+      priority: priority || "Normal",
       status: status || "planning",
       members: projectMembers,
     });
@@ -193,42 +194,45 @@ const updateProject = async (req, res) => {
       });
     }
 
-    const allowedFields = [
-      "name",
-      "description",
-      "client",
-      "startDate",
-      "deadline",
-      "status",
-    ];
+    const { name, description, client, startDate, deadline, priority, status, members } = req.body;
 
-    allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        project[field] = req.body[field];
-      }
-    });
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (client !== undefined) updateData.client = client;
+    if (startDate !== undefined) updateData.startDate = startDate;
+    if (deadline !== undefined) updateData.deadline = deadline;
+    if (priority !== undefined) updateData.priority = priority;
+    if (status !== undefined) updateData.status = status;
+    if (members !== undefined) updateData.members = members;
 
-    await project.save();
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    )
+      .populate("manager", "firstName lastName email role")
+      .populate("client", "firstName lastName email role")
+      .populate("members.user", "firstName lastName email role");
 
     await createAuditLog({
       userId: req.user._id,
       action: "PROJECT_UPDATED",
-      details: `Updated project "${project.name}".`,
+      details: `Updated project "${updatedProject.name}".`,
       req,
     });
 
     await createNotifications({
-      recipientIds: getProjectRecipients(project),
-      projectId: project._id,
+      recipientIds: getProjectRecipients({
+        manager: updatedProject.manager?._id,
+        client: updatedProject.client?._id,
+        members: updatedProject.members.map((m) => ({ user: m.user?._id })),
+      }),
+      projectId: updatedProject._id,
       actorId: req.user._id,
       type: "project_updated",
-      message: `Project "${project.name}" was updated.`,
+      message: `Project "${updatedProject.name}" was updated.`,
     });
-
-    const updatedProject = await Project.findById(project._id)
-      .populate("manager", "firstName lastName email role")
-      .populate("client", "firstName lastName email role")
-      .populate("members.user", "firstName lastName email role");
 
     res.json({
       message: "Project updated successfully.",
@@ -239,6 +243,7 @@ const updateProject = async (req, res) => {
 
     res.status(500).json({
       message: "Failed to update project.",
+      error: error.message,
     });
   }
 };

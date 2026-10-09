@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createComment,
   getAssetComments,
+  getAllComments,
   updateComment,
   deleteComment,
 } = require("../controllers/commentController");
@@ -12,11 +13,14 @@ const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
+// DASHBOARD: Get all comments for the activity feed
+router.get("/", protect, getAllComments);
+
 router.post(
   "/asset/:assetId",
   protect,
   authorize("admin", "manager", "client", "artist"),
-  createComment,
+  createComment
 );
 
 router.get("/asset/:assetId", protect, getAssetComments);
