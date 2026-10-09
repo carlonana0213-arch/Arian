@@ -22,7 +22,7 @@ const hasProjectAccess = (project, user) => {
 
 const createTask = async (req, res) => {
   try {
-    const { assetId, title, description, assignedTo } = req.body;
+    const { assetId, title, description, assignedTo, deadline } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({
@@ -53,7 +53,6 @@ const createTask = async (req, res) => {
     }
 
     const isManager = req.user.role === "admin" || req.user.role === "manager";
-
     const isArtist = req.user.role === "artist";
 
     if (!isManager && !isArtist) {
@@ -66,8 +65,9 @@ const createTask = async (req, res) => {
       project: project._id,
       asset: asset._id,
       title: title.trim(),
-      description: description || "",
+      description: description ? description.trim() : "",
       assignedTo: assignedTo || null,
+      deadline: deadline && deadline !== "" ? new Date(deadline) : null,
       createdBy: req.user._id,
     });
 
@@ -133,10 +133,25 @@ const getAssetTasks = async (req, res) => {
   }
 };
 
+const getAllTasks = async (req, res) => {
+  try {
+    const tasks = await Task.find()
+      .populate("project", "name")
+      .populate("asset", "title")
+      .populate("assignedTo", "firstName lastName email role")
+      .sort({ createdAt: -1 });
+
+    res.json({ tasks });
+  } catch (error) {
+    console.error("Get all tasks error:", error);
+    res.status(500).json({ message: "Failed to load all tasks" });
+  }
+};
+
 const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { completed, title, description, assignedTo } = req.body;
+    const { completed, title, description, assignedTo, deadline } = req.body;
 
     const task = await Task.findById(id);
 
@@ -147,7 +162,6 @@ const updateTask = async (req, res) => {
     }
 
     const isManager = req.user.role === "admin" || req.user.role === "manager";
-
     const isArtist = req.user.role === "artist";
 
     if (!isManager && !isArtist) {
@@ -156,30 +170,25 @@ const updateTask = async (req, res) => {
       });
     }
 
-    // Only artists can mark tasks as completed/uncompleted
-    if (typeof completed === "boolean" && !isArtist) {
-      return res.status(403).json({
-        message: "Only artists can mark tasks as completed.",
-      });
-    }
-
     if (typeof completed === "boolean") {
       task.completed = completed;
       task.completedAt = completed ? new Date() : null;
     }
 
-    if (isManager) {
-      if (title !== undefined) {
-        task.title = title.trim();
-      }
+    if (title !== undefined) {
+      task.title = title.trim();
+    }
 
-      if (description !== undefined) {
-        task.description = description;
-      }
+    if (description !== undefined) {
+      task.description = description;
+    }
 
-      if (assignedTo !== undefined) {
-        task.assignedTo = assignedTo || null;
-      }
+    if (assignedTo !== undefined) {
+      task.assignedTo = assignedTo || null;
+    }
+
+    if (deadline !== undefined) {
+      task.deadline = deadline && deadline !== "" ? new Date(deadline) : null;
     }
 
     await task.save();
@@ -200,6 +209,7 @@ const updateTask = async (req, res) => {
     });
   }
 };
+
 const deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
@@ -235,6 +245,7 @@ const deleteTask = async (req, res) => {
 module.exports = {
   createTask,
   getAssetTasks,
+  getAllTasks,
   updateTask,
   deleteTask,
 };

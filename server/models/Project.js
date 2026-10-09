@@ -46,6 +46,12 @@ const projectSchema = new mongoose.Schema(
       type: Date,
     },
 
+    priority: {
+      type: String,
+      enum: ["low", "normal", "high", "urgent", "Low", "Normal", "High", "Urgent"],
+      default: "Normal",
+    },
+
     status: {
       type: String,
       enum: ["planning", "active", "completed", "archived"],

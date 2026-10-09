@@ -15,7 +15,8 @@ const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.post("/", protect, authorize("admin", "manager"), createProject);
+// Added "artist" to the authorize middleware so they can create projects
+router.post("/", protect, authorize("admin", "manager", "artist"), createProject);
 
 router.get("/", protect, getProjects);
 

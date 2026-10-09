@@ -23,17 +23,18 @@ export const createAsset = async (projectId, assetData) => {
   formData.append("title", assetData.title);
   formData.append("description", assetData.description || "");
   formData.append("assetType", assetData.assetType || "image");
-  formData.append("image", assetData.image);
+  formData.append("file", assetData.file || assetData.image); // Matches upload.single("file")
 
   const response = await api.post(`/assets/project/${projectId}`, formData);
 
   return response.data;
 };
 
-export const uploadNewVersion = async (assetId, image) => {
+export const uploadNewVersion = async (assetId, file, note = "") => {
   const formData = new FormData();
 
-  formData.append("image", image);
+  formData.append("file", file); // Matches upload.single("file")
+  formData.append("note", note); // Appends the comprehensive version notes/description
 
   const response = await api.post(`/assets/${assetId}/versions`, formData);
 

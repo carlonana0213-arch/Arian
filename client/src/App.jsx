@@ -5,7 +5,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { ThemeProvider } from "./context/ThemeContext"; // <-- ADD THIS
+import { ThemeProvider } from "./context/ThemeContext";
 import Navbar from "./components/Navbar";
 import MessagingWidget from "./components/MessagingWidget";
 import Dashboard from "./pages/Dashboard";
@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Notifications from "./pages/Notifications";
 import ProjectAssets from "./pages/ProjectAssets";
+
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
 
@@ -27,8 +28,6 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        {" "}
-        {/* <-- ADD WRAPPER HERE */}
         <Router>
           <div className="min-h-screen flex flex-col bg-[#0a0a0a] transition-colors duration-300">
             <Navbar />
@@ -52,6 +51,7 @@ function App() {
                 }
               />
 
+              {/* Points to the project asset grid view first */}
               <Route
                 path="/project/:id"
                 element={
@@ -61,6 +61,7 @@ function App() {
                 }
               />
 
+              {/* Points to the specific asset review and detail workspace */}
               <Route
                 path="/project/:id/asset/:assetId"
                 element={
@@ -69,14 +70,7 @@ function App() {
                   </PrivateRoute>
                 }
               />
-              <Route
-                path="/project/:id"
-                element={
-                  <PrivateRoute>
-                    <ProjectDetails />
-                  </PrivateRoute>
-                }
-              />
+
               <Route
                 path="/profile"
                 element={
