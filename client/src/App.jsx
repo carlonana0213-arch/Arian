@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Notifications from "./pages/Notifications";
 import ProjectAssets from "./pages/ProjectAssets";
+import Admin from "./pages/Admin"; // <-- ADD THIS
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
 
@@ -43,6 +44,16 @@ function App() {
                   </PrivateRoute>
                 }
               />
+
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute>
+                    <Admin />
+                  </PrivateRoute>
+                }
+              />
+
               <Route
                 path="/projects"
                 element={

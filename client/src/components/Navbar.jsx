@@ -215,6 +215,16 @@ const Navbar = () => {
                 Settings
               </Link>
 
+              {user.role === "admin" && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  Admin Console
+                </Link>
+              )}
+
               <div className="border-t border-[#333333] mt-1 pt-1">
                 {/* FIXED: hover:bg-[#1e1e1e] -> hover:bg-white/5 */}
                 <button

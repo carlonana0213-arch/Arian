@@ -202,6 +202,13 @@ const Profile = () => {
           subtitle: log.details,
         };
 
+      case "USER_UPDATED":
+        return {
+          icon: "🛡️",
+          title: "Updated a user account",
+          subtitle: log.details,
+        };
+
       default:
         return {
           icon: "📝",

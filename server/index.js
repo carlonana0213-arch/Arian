@@ -14,6 +14,7 @@ const assetRoutes = require("./routes/assetRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 connectDB();
 
@@ -52,6 +53,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/users", userRoutes);
 
